@@ -56,17 +56,26 @@ int readhostkey(const char * filename, sign_key * hostkey, int *type);
 
 typedef struct svr_runopts {
 
+#if 0
 	char * rsakeyfile;
 	char * dsskeyfile;
+#endif
 	char * bannerfile;
 
 	int forkbg;
 	int usingsyslog;
 
+#if 0
 	/* ports is an array of the portcount listening ports */
 	char *ports[DROPBEAR_MAX_PORTS];
 	unsigned int portcount;
 	char *addresses[DROPBEAR_MAX_PORTS];
+#endif
+    struct ccn* ssh_ccn;
+    char *ccnxdomain;
+    struct ccn_keystore *ccn_cached_keystore;
+    char *clients[DROPBEAR_MAX_CLIENTS];
+
 
 	int inetdmode;
 
@@ -102,7 +111,9 @@ typedef struct svr_runopts {
 extern svr_runopts svr_opts;
 
 void svr_getopts(int argc, char ** argv);
+#if 0
 void loadhostkeys();
+#endif
 
 typedef struct cli_runopts {
 

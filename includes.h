@@ -143,6 +143,22 @@ typedef u_int16_t uint16_t;
 #define LOG_AUTHPRIV LOG_AUTH
 #endif
 
+/* OpenSSL */
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <openssl/x509.h>
+#include <openssl/aes.h>
+
+/* CCN */
+#include <ccn/ccn.h>
+#include <ccn/charbuf.h>
+#include <ccn/uri.h>
+#include <ccn/header.h>
+#include <ccn/keystore.h>
+#include <ccn/signing.h>
+#include "ccn-enc.h"
+#include "ccn-keys.h"
+
 /* so we can avoid warnings about unused params (ie in signal handlers etc) */
 #ifdef UNUSED 
 #elif defined(__GNUC__) 

@@ -71,10 +71,14 @@ static void printhelp(const char * progname) {
 					"-k		Disable remote port forwarding\n"
 					"-a		Allow connections to forwarded ports from any host\n"
 #endif
+#if 0
 					"-p [address:]port\n"
 					"		Listen on specified tcp port (and optionally address),\n"
 					"		up to %d can be specified\n"
 					"		(default port is %s if none specified)\n"
+#endif
+                    "-p ccnx:/domain\n"
+                    "       Listen on specified CCNX URI\n"
 					"-P PidFile	Create pid file PidFile\n"
 					"		(default %s)\n"
 #ifdef INETD_MODE
@@ -101,7 +105,10 @@ void svr_getopts(int argc, char ** argv) {
 
 	unsigned int i;
 	char ** next = 0;
+#if 0
 	int nextisport = 0;
+#endif
+    int nextisccnx = 0;
 	char* recv_window_arg = NULL;
 	char* keepalive_arg = NULL;
 	char* idle_timeout_arg = NULL;
@@ -116,7 +123,9 @@ void svr_getopts(int argc, char ** argv) {
 	svr_opts.noauthpass = 0;
 	svr_opts.norootpass = 0;
 	svr_opts.inetdmode = 0;
+#if 0
 	svr_opts.portcount = 0;
+#endif
 	svr_opts.hostkey = NULL;
 	svr_opts.pidfile = DROPBEAR_PIDFILE;
 #ifdef ENABLE_SVR_LOCALTCPFWD
@@ -147,12 +156,18 @@ void svr_getopts(int argc, char ** argv) {
 #endif
 
 	for (i = 1; i < (unsigned int)argc; i++) {
+#if 0
 		if (nextisport) {
 			addportandaddress(argv[i]);
 			nextisport = 0;
 			continue;
 		}
-	  
+#endif
+        if (nextisccnx) {
+            addccnxuri(argv[i]);
+            nextisccnx = 0;
+            continue;
+        }
 		if (next) {
 			*next = argv[i];
 			if (*next == NULL) {
@@ -167,6 +182,7 @@ void svr_getopts(int argc, char ** argv) {
 				case 'b':
 					next = &svr_opts.bannerfile;
 					break;
+#if 0
 #ifdef DROPBEAR_DSS
 				case 'd':
 					next = &svr_opts.dsskeyfile;
@@ -176,6 +192,7 @@ void svr_getopts(int argc, char ** argv) {
 				case 'r':
 					next = &svr_opts.rsakeyfile;
 					break;
+#endif
 #endif
 				case 'F':
 					svr_opts.forkbg = 0;
@@ -257,18 +274,19 @@ void svr_getopts(int argc, char ** argv) {
 	}
 
 	/* Set up listening ports */
+#if 0
 	if (svr_opts.portcount == 0) {
 		svr_opts.ports[0] = m_strdup(DROPBEAR_DEFPORT);
 		svr_opts.addresses[0] = m_strdup(DROPBEAR_DEFADDRESS);
 		svr_opts.portcount = 1;
 	}
-
 	if (svr_opts.dsskeyfile == NULL) {
 		svr_opts.dsskeyfile = DSS_PRIV_FILENAME;
 	}
 	if (svr_opts.rsakeyfile == NULL) {
 		svr_opts.rsakeyfile = RSA_PRIV_FILENAME;
 	}
+#endif
 
 	if (svr_opts.bannerfile) {
 		struct stat buf;
@@ -315,6 +333,7 @@ void svr_getopts(int argc, char ** argv) {
 	}
 }
 
+#if 0
 static void addportandaddress(char* spec) {
 
 	char *myspec = NULL;
@@ -350,7 +369,21 @@ static void addportandaddress(char* spec) {
 		svr_opts.portcount++;
 	}
 }
+#endif
 
+static void addccnxuri(char* spec) {
+    char *myspec = NULL;
+
+    if( spec == NULL )
+        dropbear_exit("Bad ccnx URI");
+    }
+
+    myspec = m_strdup(spec);
+
+    svr_opts.ccnxdomain = myspec;
+}
+
+#if 0
 static void disablekey(int type, const char* filename) {
 
 	int i;
@@ -403,3 +436,4 @@ void loadhostkeys() {
 
 	TRACE(("leave loadhostkeys"))
 }
+#endif

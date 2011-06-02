@@ -141,6 +141,8 @@ void seedrandom() {
 
 	counter = 0;
 	donerandinit = 1;
+
+    srand(time(NULL));
 }
 
 /* hash the current random pool with some unique identifiers

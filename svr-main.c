@@ -30,7 +30,10 @@
 #include "runopts.h"
 #include "random.h"
 
+#if 0
 static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
+#endif
+
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
 static void sigintterm_handler(int fish);
@@ -77,16 +80,20 @@ int main(int argc, char ** argv)
 
 #ifdef INETD_MODE
 static void main_inetd() {
+#if 0
 	char *host, *port = NULL;
+#endif
 
 	/* Set up handlers, syslog, seed random */
 	commonsetup();
 
+#if 0
 	/* In case our inetd was lax in logging source addresses */
 	get_socket_address(0, NULL, NULL, &host, &port, 0);
 	dropbear_log(LOG_INFO, "Child connection from %s:%s", host, port);
 	m_free(host);
 	m_free(port);
+#endif
 
 	/* Don't check the return value - it may just fail since inetd has
 	 * already done setsid() after forking (xinetd on Darwin appears to do
@@ -104,6 +111,7 @@ static void main_inetd() {
 
 #ifdef NON_INETD_MODE
 void main_noinetd() {
+#if 0
 	fd_set fds;
 	unsigned int i, j;
 	int val;
@@ -117,6 +125,7 @@ void main_noinetd() {
 
 	int childsock;
 	int childpipe[2];
+#endif
 
 	/* Note: commonsetup() must happen before we daemon()ise. Otherwise
 	   daemon() will chdir("/"), and we won't be able to find local-dir
@@ -124,6 +133,7 @@ void main_noinetd() {
 	commonsetup();
 
 	/* sockets to identify pre-authenticated clients */
+#if 0
 	for (i = 0; i < MAX_UNAUTH_CLIENTS; i++) {
 		childpipes[i] = -1;
 	}
@@ -135,6 +145,7 @@ void main_noinetd() {
 	{
 		dropbear_exit("No listening ports available.");
 	}
+#endif
 
 	/* fork */
 	if (svr_opts.forkbg) {
@@ -148,7 +159,7 @@ void main_noinetd() {
 			dropbear_exit("Failed to daemonize: %s", strerror(errno));
 		}
 	}
-
+#endif
 	/* should be done after syslog is working */
 	if (svr_opts.forkbg) {
 		dropbear_log(LOG_INFO, "Running in background");
@@ -163,9 +174,13 @@ void main_noinetd() {
 		fclose(pidfile);
 	}
 
+    ccn_publish_server_mountpoint();
+
+    ccn_run(svr_opts.ssh_cnn,-1);
+
+#if 0
 	/* incoming connection select loop */
 	for(;;) {
-
 		FD_ZERO(&fds);
 		
 		/* listening sockets */
@@ -316,7 +331,7 @@ out:
 			}
 		}
 	} /* for(;;) loop */
-
+#endif
 	/* don't reach here */
 }
 #endif /* NON_INETD_MODE */
@@ -379,11 +394,20 @@ static void commonsetup() {
 
 	/* Now we can setup the hostkeys - needs to be after logging is on,
 	 * otherwise we might end up blatting error messages to the socket */
+#if 0
 	loadhostkeys();
+#endif
+
+    svr_opts.ssh_ccn = ccn_create();
+    svr.opts.ccn_cached_keystore = ccn_init_keystore();
+    if( svr_opts.ssh_ccn == NULL || ccn_connect(svr_opts.ssh_ccn,NULL) == -1 )
+        dropbear_exit("Failed to connect to ccnd");
+    ccn_publish_host_key();
 
     seedrandom();
 }
 
+#if 0
 /* Set up listening sockets for all the requested ports */
 static size_t listensockets(int *sock, size_t sockcount, int *maxfd) {
 	
@@ -413,4 +437,171 @@ static size_t listensockets(int *sock, size_t sockcount, int *maxfd) {
 
 	}
 	return sockpos;
+}
+#endif
+
+static void
+ccn_publish_host_key()
+{
+    if( ccn_publish_key(svr_opts.ssh_ccn,
+                svr_opts.ccn_cached_keystore,
+                svr_opts.ccnxdomain) < 0 )
+        dropbear_exit("Could not publish ccn host key");
+}
+
+static void
+ccn_publish_server_mountpoint()
+{
+    int result;
+    struct ccn_charbuf *mountpoint;
+
+    mountpoint = ccn_charbuf_create();
+    if( mountpoint == NULL )
+        dropbear_exit("Failed to allocate client mountpoint charbuf");
+
+    result = ccn_name_from_uri(mountpoint,svr_opts.ccnxdomain);
+    if( result < 0 )
+        dropbear_exit("Can't resolve server domain");
+
+    ccn_name_append_str(mountpoint,"ssh");
+    ccn_name_append_str(mountpoint,"client");
+
+    result = ccn_set_interest_filter(svr_opts.ssh_ccn,mountpoint,&newClientAction);
+    if( result < 0 )
+        dropbear_exit("Could not register server mountpoint");
+}
+
+static void
+ccn_publish_client_connectpoint(size_t client_idx)
+{
+    int result;
+    struct ccn_charbuf *mountpoint;
+    char *client_uri = svr_opts.clients[client_idx];
+
+    mountpoint = ccn_charbuf_create();
+    if( mountpoint == NULL )
+        dropbear_exit("Failed to allocate server mountpoint charbuf");
+
+    result = ccn_name_from_uri(mountpoint,client_uri);
+    if( result < 0 )
+        dropbear_exit("Can't resolve client domain");
+
+    result = ccn_set_interest_filter(svr_opts.ssh_ccn,mountpoint,&clientAction);
+    if( result < 0 )
+        dropbear_exit("Could not register client mountpoint");
+}
+
+/*
+ * Incoming new interest on domain/ssh/client
+ */
+static enum ccn_upcall_res
+newClientHandler(struc ccn_closure *selfp,
+        enum ccn_upcall_kind kind,
+        struct ccn_ipcall_info *info)
+{
+    int result;
+	size_t num_unauthed_total = 0;
+	pid_t fork_ret = 0;
+    int child_stat_loc;
+	size_t conn_idx = DROPBEAR_MAX_CLIENTS;
+
+    unsigned char *client_domain = NULL;
+    size_t client_domain_length = 0;
+    unsigned char *client_name_str = NULL;
+    unsigned char *client_mountid_str = NULL;
+
+    struct charbuf *reply = NULL;
+    size_t reply_length = 0;
+
+
+    if (exitflag) {
+        unlink(svr_opts.pidfile);
+        dropbear_exit("Terminated by signal");
+    }
+
+    for( int i = 0 ; i < DROPBEAR_MAX_CLIENTS ; i++ ) {
+        if( svr_opts.clients[i] == NULL )
+            conn_idx = i
+    }
+
+    if( conn_idx == DROPBEAR_MAX_CLIENTS ) {
+        dropbear_log(LOG_WARNING,"Reached max clients");
+        return CCN_UPCALL_RESULT_ERR;
+    }
+
+    switch (kind) {
+        case CCN_UPCALL_INTEREST:
+            break;
+        default:
+            return CCN_UPCALL_RESULT_ERR;
+    }
+
+#ifdef DEBUG_NOFORK
+    fork_ret = 0;
+#else
+    fork_ret = fork();
+#endif
+    if( fork_ret < 0 ) {
+        dropbear_log(LOG_WARNING, "Error forking: %s", strerror(errno));
+        return CCN_UPCALL_RESULT_ERR;
+    } else if( fork_ret > 0 ) {
+        /* parent */
+        while(waitpid(fork_ret, &child_stat_loc, WNOHANG) > 0);
+
+        if (WIFEXITED(child_stat_lock))
+            return CCN_UPCALL_INTEREST_CONSUMED;
+        else {
+            dropbear_log(LOG_WARNING, "Failed to handle new client via fork");
+            return CCN_UPCALL_RESULT_ERR;
+        }
+    } else {
+        /* child */
+#ifdef DEBUG_FORKGPROF
+		extern void _start(void), etext(void);
+		monstartup((u_long)&_start, (u_long)&etext);
+#endif /* DEBUG_FORKGPROF */
+
+        if( ccn_name_comp_get(info->interest_ccnb,
+                info->interest_comps,info->matched_comps,
+                &client_domain, &client_domain_length) < 0 )
+            dropbear_exit("Error parsing client ccn domain");
+
+        client_name_str = strdup(client_domain);
+        strcat(client_name_str,itoa(rand()));
+        svr_opts.clients[conn_idx] = client_name_str;
+
+        ccn_publish_client_connectpoint(conn_idx);
+
+        result = ccn_wrap_content(info->interest_ccnb,
+                reply,reply_length,
+                client_mountid_str);
+        ccn_charbuf_destroy(&reply);
+        if( ccn_put(info->h,reply->buf,reply->length) < 0 )
+            dropbear_exit("Failed to reply to client");
+
+        #ifdef DEBUG_NOFORK
+            fork_ret = 0;
+        #else
+            fork_ret = fork();
+        #endif
+        if( fork_ret < 0 ) {
+            dropbear_exit("Error forking: %s", strerror(errno));
+        } else if( fork_ret > 0 ) {
+            /* parent */
+            /* Close normally */
+            dropbear_close();
+        } else {
+#ifdef DEBUG_FORKGPROF
+		extern void _start(void), etext(void);
+		monstartup((u_long)&_start, (u_long)&etext);
+#endif /* DEBUG_FORKGPROF */
+            /* Start session and never return */
+            svr_session(client_name_str);
+            dropbear_assert(0);
+        }
+        /* Should not get here */
+        dropbear_assert(0);
+    }
+    /* Should not get here */
+    dropbear_assert(0);
 }
