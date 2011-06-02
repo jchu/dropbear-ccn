@@ -134,7 +134,7 @@ const char *crypt_build_settings =
 #if defined(TIGER)
    "   TIGER\n"
 #endif
-#if defined(SHA1)
+#if defined(dbSHA1)
    "   SHA1\n"
 #endif
 #if defined(MD5)

@@ -93,7 +93,7 @@ int yarrow_start(prng_state *prng)
    prng->yarrow.hash   = register_hash(&sha512_desc);
 #elif defined(TIGER)
    prng->yarrow.hash   = register_hash(&tiger_desc);
-#elif defined(SHA1)
+#elif defined(dbSHA1)
    prng->yarrow.hash   = register_hash(&sha1_desc);
 #elif defined(RIPEMD320)
    prng->yarrow.hash   = register_hash(&rmd320_desc);

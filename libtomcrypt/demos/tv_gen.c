@@ -66,7 +66,7 @@ void reg_algs(void)
 #ifdef MD5
   register_hash (&md5_desc);
 #endif
-#ifdef SHA1
+#ifdef dbSHA1
   register_hash (&sha1_desc);
 #endif
 #ifdef SHA224

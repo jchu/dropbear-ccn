@@ -122,7 +122,7 @@
 #define SHA512
 #endif
 
-#define SHA1
+#define dbSHA1
 
 #ifdef DROPBEAR_MD5_HMAC
 #define MD5

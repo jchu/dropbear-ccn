@@ -16,7 +16,7 @@
 */
 
 
-#ifdef SHA1
+#ifdef dbSHA1
 
 const struct ltc_hash_descriptor sha1_desc =
 {

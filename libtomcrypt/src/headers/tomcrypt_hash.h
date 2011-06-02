@@ -15,7 +15,7 @@ struct sha256_state {
 };
 #endif
 
-#ifdef SHA1
+#ifdef dbSHA1
 struct sha1_state {
     ulong64 length;
     ulong32 state[5], curlen;
@@ -116,7 +116,7 @@ typedef union Hash_state {
 #ifdef SHA256
     struct sha256_state sha256;
 #endif
-#ifdef SHA1
+#ifdef dbSHA1
     struct sha1_state   sha1;
 #endif
 #ifdef MD5
@@ -246,7 +246,7 @@ extern const struct ltc_hash_descriptor sha224_desc;
 #endif
 #endif
 
-#ifdef SHA1
+#ifdef dbSHA1
 int sha1_init(hash_state * md);
 int sha1_process(hash_state * md, const unsigned char *in, unsigned long inlen);
 int sha1_done(hash_state * md, unsigned char *hash);
