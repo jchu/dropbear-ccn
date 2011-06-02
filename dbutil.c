@@ -107,9 +107,6 @@ static void generic_dropbear_exit(int exitcode, const char* format,
 
 	_dropbear_log(LOG_INFO, fmtbuf, param);
 
-    if( ssh_ccn != NULL )
-        ccn_destroy(&ssh_ccn);
-
 	exit(exitcode);
 }
 

@@ -45,6 +45,9 @@ static void main_noinetd();
 #endif
 static void commonsetup();
 
+static void ccn_publish_host_key();
+static void ccn_publish_server_mountpoint();
+
 #if defined(DBMULTI_dropbear) || !defined(DROPBEAR_MULTI)
 #if defined(DBMULTI_dropbear) && defined(DROPBEAR_MULTI)
 int dropbear_main(int argc, char ** argv)
@@ -111,6 +114,7 @@ static void main_inetd() {
 
 #ifdef NON_INETD_MODE
 void main_noinetd() {
+	FILE *pidfile = NULL;
 #if 0
 	fd_set fds;
 	unsigned int i, j;
@@ -159,7 +163,6 @@ void main_noinetd() {
 			dropbear_exit("Failed to daemonize: %s", strerror(errno));
 		}
 	}
-#endif
 	/* should be done after syslog is working */
 	if (svr_opts.forkbg) {
 		dropbear_log(LOG_INFO, "Running in background");
@@ -176,7 +179,7 @@ void main_noinetd() {
 
     ccn_publish_server_mountpoint();
 
-    ccn_run(svr_opts.ssh_cnn,-1);
+    ccn_run(svr_opts.ssh_ccn,-1);
 
 #if 0
 	/* incoming connection select loop */
@@ -399,7 +402,7 @@ static void commonsetup() {
 #endif
 
     svr_opts.ssh_ccn = ccn_create();
-    svr.opts.ccn_cached_keystore = ccn_init_keystore();
+    svr_opts.ccn_cached_keystore = ccn_init_keystore();
     if( svr_opts.ssh_ccn == NULL || ccn_connect(svr_opts.ssh_ccn,NULL) == -1 )
         dropbear_exit("Failed to connect to ccnd");
     ccn_publish_host_key();
@@ -495,9 +498,9 @@ ccn_publish_client_connectpoint(size_t client_idx)
  * Incoming new interest on domain/ssh/client
  */
 static enum ccn_upcall_res
-newClientHandler(struc ccn_closure *selfp,
+newClientHandler(struct ccn_closure *selfp,
         enum ccn_upcall_kind kind,
-        struct ccn_ipcall_info *info)
+        struct ccn_upcall_info *info)
 {
     int result;
 	size_t num_unauthed_total = 0;
@@ -505,12 +508,12 @@ newClientHandler(struc ccn_closure *selfp,
     int child_stat_loc;
 	size_t conn_idx = DROPBEAR_MAX_CLIENTS;
 
-    unsigned char *client_domain = NULL;
+    const unsigned char *client_domain = NULL;
     size_t client_domain_length = 0;
     unsigned char *client_name_str = NULL;
     unsigned char *client_mountid_str = NULL;
 
-    struct charbuf *reply = NULL;
+    struct ccn_charbuf *reply = NULL;
     size_t reply_length = 0;
 
 
@@ -519,9 +522,10 @@ newClientHandler(struc ccn_closure *selfp,
         dropbear_exit("Terminated by signal");
     }
 
-    for( int i = 0 ; i < DROPBEAR_MAX_CLIENTS ; i++ ) {
+    int i;
+    for( i = 0 ; i < DROPBEAR_MAX_CLIENTS ; i++ ) {
         if( svr_opts.clients[i] == NULL )
-            conn_idx = i
+            conn_idx = i;
     }
 
     if( conn_idx == DROPBEAR_MAX_CLIENTS ) {
@@ -548,8 +552,8 @@ newClientHandler(struc ccn_closure *selfp,
         /* parent */
         while(waitpid(fork_ret, &child_stat_loc, WNOHANG) > 0);
 
-        if (WIFEXITED(child_stat_lock))
-            return CCN_UPCALL_INTEREST_CONSUMED;
+        if (WIFEXITED(child_stat_loc))
+            return CCN_UPCALL_RESULT_INTEREST_CONSUMED;
         else {
             dropbear_log(LOG_WARNING, "Failed to handle new client via fork");
             return CCN_UPCALL_RESULT_ERR;
@@ -566,7 +570,7 @@ newClientHandler(struc ccn_closure *selfp,
                 &client_domain, &client_domain_length) < 0 )
             dropbear_exit("Error parsing client ccn domain");
 
-        client_name_str = strdup(client_domain);
+        client_name_str = strdup((const char *)client_domain);
         strcat(client_name_str,itoa(rand()));
         svr_opts.clients[conn_idx] = client_name_str;
 
@@ -575,9 +579,9 @@ newClientHandler(struc ccn_closure *selfp,
         result = ccn_wrap_content(info->interest_ccnb,
                 reply,reply_length,
                 client_mountid_str);
-        ccn_charbuf_destroy(&reply);
         if( ccn_put(info->h,reply->buf,reply->length) < 0 )
             dropbear_exit("Failed to reply to client");
+        ccn_charbuf_destroy(&reply);
 
         #ifdef DEBUG_NOFORK
             fork_ret = 0;
@@ -589,7 +593,7 @@ newClientHandler(struc ccn_closure *selfp,
         } else if( fork_ret > 0 ) {
             /* parent */
             /* Close normally */
-            dropbear_close();
+            dropbear_close("Child fork done");
         } else {
 #ifdef DEBUG_FORKGPROF
 		extern void _start(void), etext(void);

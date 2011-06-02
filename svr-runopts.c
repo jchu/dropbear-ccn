@@ -32,7 +32,10 @@
 svr_runopts svr_opts; /* GLOBAL */
 
 static void printhelp(const char * progname);
+#if 0
 static void addportandaddress(char* spec);
+#endif
+static void addccnxuri(char* spec);
 
 static void printhelp(const char * progname) {
 
@@ -97,7 +100,10 @@ static void printhelp(const char * progname) {
 #ifdef DROPBEAR_RSA
 					RSA_PRIV_FILENAME,
 #endif
+#if 0
 					DROPBEAR_MAX_PORTS, DROPBEAR_DEFPORT, DROPBEAR_PIDFILE,
+#endif
+					DROPBEAR_PIDFILE,
 					DEFAULT_RECV_WINDOW, DEFAULT_KEEPALIVE, DEFAULT_IDLE_TIMEOUT);
 }
 
@@ -114,8 +120,10 @@ void svr_getopts(int argc, char ** argv) {
 	char* idle_timeout_arg = NULL;
 
 	/* see printhelp() for options */
+#if 0
 	svr_opts.rsakeyfile = NULL;
 	svr_opts.dsskeyfile = NULL;
+#endif
 	svr_opts.bannerfile = NULL;
 	svr_opts.banner = NULL;
 	svr_opts.forkbg = 1;
@@ -221,7 +229,7 @@ void svr_getopts(int argc, char ** argv) {
 					break;
 #endif
 				case 'p':
-				  nextisport = 1;
+				  nextisccnx = 1;
 				  break;
 				case 'P':
 					next = &svr_opts.pidfile;
@@ -371,12 +379,13 @@ static void addportandaddress(char* spec) {
 }
 #endif
 
-static void addccnxuri(char* spec) {
+static void
+addccnxuri(char* spec)
+{
     char *myspec = NULL;
 
     if( spec == NULL )
         dropbear_exit("Bad ccnx URI");
-    }
 
     myspec = m_strdup(spec);
 
