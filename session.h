@@ -41,7 +41,10 @@
 extern int sessinitdone; /* Is set to 0 somewhere */
 extern int exitflag;
 
+#if 0
 void common_session_init(int sock_in, int sock_out);
+#endif
+void common_session_init();
 void session_loop(void(*loophandler)());
 void common_session_cleanup();
 void session_identification();
@@ -51,7 +54,10 @@ const char* get_user_shell();
 void fill_passwd(const char* username);
 
 /* Server */
+#if 0
 void svr_session(int sock, int childpipe);
+#endif
+void svr_session(int conn_idx);
 void svr_dropbear_exit(int exitcode, const char* format, va_list param);
 void svr_dropbear_log(int priority, const char* format, va_list param);
 
@@ -201,7 +207,11 @@ struct sshsession {
 struct serversession {
 
 	/* Server specific options */
+#if 0
 	int childpipe; /* kept open until we successfully authenticate */
+#endif
+    int conn_idx;
+
 	/* userauth */
 
 	struct ChildPid * childpids; /* array of mappings childpid<->channel */
@@ -210,12 +220,13 @@ struct serversession {
 	/* Used to avoid a race in the exit returncode handling - see
 	 * svr-chansession.c for details */
 	struct exitinfo lastexit;
-
+#if 0
 	/* The numeric address they connected from, used for logging */
 	char * addrstring;
 
 	/* The resolved remote address, used for lastlog etc */
 	char *remotehost;
+#endif
 
 #ifdef __uClinux__
 	pid_t server_pid;

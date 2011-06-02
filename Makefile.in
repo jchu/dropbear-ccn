@@ -22,7 +22,7 @@ CFLAGS+=-I$(srcdir)/libtomcrypt/src/headers/
 LIBS+=$(LTC) $(LTM)
 endif
 
-LIBS+="-lccn -lcrypto"
+LIBS+=-lccn -lcrypto
 
 COMMONOBJS=dbutil.o buffer.o \
 		dss.o bignum.o \

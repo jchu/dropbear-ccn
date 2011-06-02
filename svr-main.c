@@ -48,6 +48,15 @@ static void commonsetup();
 static void ccn_publish_host_key();
 static void ccn_publish_server_mountpoint();
 
+static enum ccn_upcall_res
+newClientHandler(struct ccn_closure *selfp,
+        enum ccn_upcall_kind kind,
+        struct ccn_upcall_info *info);
+
+static struct ccn_closure newClientAction = {
+        .p = &newClientHandler
+};
+
 #if defined(DBMULTI_dropbear) || !defined(DROPBEAR_MULTI)
 #if defined(DBMULTI_dropbear) && defined(DROPBEAR_MULTI)
 int dropbear_main(int argc, char ** argv)
@@ -106,7 +115,7 @@ static void main_inetd() {
 	/* Start service program 
 	 * -1 is a dummy childpipe, just something we can close() without 
 	 * mattering. */
-	svr_session(0, -1);
+	svr_session(0);
 
 	/* notreached */
 }
@@ -489,7 +498,7 @@ ccn_publish_client_connectpoint(size_t client_idx)
     if( result < 0 )
         dropbear_exit("Can't resolve client domain");
 
-    result = ccn_set_interest_filter(svr_opts.ssh_ccn,mountpoint,&clientAction);
+    result = ccn_set_interest_filter(svr_opts.ssh_ccn,mountpoint,&authClientAction);
     if( result < 0 )
         dropbear_exit("Could not register client mountpoint");
 }
@@ -503,7 +512,6 @@ newClientHandler(struct ccn_closure *selfp,
         struct ccn_upcall_info *info)
 {
     int result;
-	size_t num_unauthed_total = 0;
 	pid_t fork_ret = 0;
     int child_stat_loc;
 	size_t conn_idx = DROPBEAR_MAX_CLIENTS;
@@ -511,6 +519,7 @@ newClientHandler(struct ccn_closure *selfp,
     const unsigned char *client_domain = NULL;
     size_t client_domain_length = 0;
     unsigned char *client_name_str = NULL;
+    char clientid_str[6];
     unsigned char *client_mountid_str = NULL;
 
     struct ccn_charbuf *reply = NULL;
@@ -571,7 +580,9 @@ newClientHandler(struct ccn_closure *selfp,
             dropbear_exit("Error parsing client ccn domain");
 
         client_name_str = strdup((const char *)client_domain);
-        strcat(client_name_str,itoa(rand()));
+
+        sprintf(clientid_str,"%6d",rand());
+        strcat(client_name_str,clientid_str);
         svr_opts.clients[conn_idx] = client_name_str;
 
         ccn_publish_client_connectpoint(conn_idx);
@@ -600,7 +611,7 @@ newClientHandler(struct ccn_closure *selfp,
 		monstartup((u_long)&_start, (u_long)&etext);
 #endif /* DEBUG_FORKGPROF */
             /* Start session and never return */
-            svr_session(client_name_str);
+            svr_session(conn_idx);
             dropbear_assert(0);
         }
         /* Should not get here */

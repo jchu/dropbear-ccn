@@ -74,16 +74,26 @@ static const struct ChanType *svr_chantypes[] = {
 	NULL /* Null termination is mandatory. */
 };
 
+#if 0
 void svr_session(int sock, int childpipe) {
 	char *host, *port;
+#endif
+void svr_session(int conn_idx) {
+#if 0
 	size_t len;
+#endif
     reseedrandom();
 
 	crypto_init();
+#if 0
 	common_session_init(sock, sock);
+#endif
 
 	/* Initialise server specific parts of the session */
+#if 0
 	svr_ses.childpipe = childpipe;
+#endif
+    svr_ses.conn_idx = conn_idx;
 #ifdef __uClinux__
 	svr_ses.server_pid = getpid();
 #endif
@@ -94,6 +104,7 @@ void svr_session(int sock, int childpipe) {
 	ses.connect_time = time(NULL);
 
 	/* for logging the remote address */
+#if 0
 	get_socket_address(ses.sock_in, NULL, NULL, &host, &port, 0);
 	len = strlen(host) + strlen(port) + 2;
 	svr_ses.addrstring = m_malloc(len);
@@ -103,7 +114,7 @@ void svr_session(int sock, int childpipe) {
 
 	get_socket_address(ses.sock_in, NULL, NULL, 
 			&svr_ses.remotehost, NULL, 1);
-
+#endif
 	/* set up messages etc */
 	ses.remoteclosed = svr_remoteclosed;
 
@@ -124,7 +135,10 @@ void svr_session(int sock, int childpipe) {
 
 	/* Run the main for loop. NULL is for the dispatcher - only the client
 	 * code makes use of it */
+#if 0
 	session_loop(NULL);
+#endif
+    ccn_run(svr_opts.ssh_ccn,-1);
 
 	/* Not reached */
 

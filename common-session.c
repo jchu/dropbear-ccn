@@ -52,13 +52,18 @@ int exitflag = 0; /* GLOBAL */
 
 
 /* called only at the start of a session, set up initial state */
+#if 0
 void common_session_init(int sock_in, int sock_out) {
+#endif
+void common_session_init() {
 
 	TRACE(("enter session_init"))
 
+#if 0
 	ses.sock_in = sock_in;
 	ses.sock_out = sock_out;
 	ses.maxfd = MAX(sock_in, sock_out);
+#endif
 
 	ses.connect_time = 0;
 	ses.last_trx_packet_time = 0;
@@ -69,9 +74,11 @@ void common_session_init(int sock_in, int sock_out) {
 	}
 	setnonblocking(ses.signal_pipe[0]);
 	setnonblocking(ses.signal_pipe[1]);
-
+#if 0
 	ses.maxfd = MAX(ses.maxfd, ses.signal_pipe[0]);
 	ses.maxfd = MAX(ses.maxfd, ses.signal_pipe[1]);
+#endif
+	ses.maxfd = MAX(ses.signal_pipe[0], ses.signal_pipe[0]);
 	
 	kexfirstinitialise(); /* initialise the kex state */
 
