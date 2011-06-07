@@ -113,10 +113,19 @@ struct sshsession {
 							(cleared after auth once we're not
 							respecting AUTH_TIMEOUT any more) */
 
+#if 0
 	int sock_in;
 	int sock_out;
+#endif
 
 	unsigned char *remoteident;
+    int conn_idx;
+
+    struct ccn *ssh_ccn;
+    struct ccn_keystore *ccn_cached_keystore;
+    char *local_name_str;
+    struct ccn_charbuf *remote_name;
+    char *remote_name_str;
 
 	int maxfd; /* the maximum file descriptor to check with select() */
 
@@ -207,10 +216,7 @@ struct sshsession {
 struct serversession {
 
 	/* Server specific options */
-#if 0
 	int childpipe; /* kept open until we successfully authenticate */
-#endif
-    int conn_idx;
 
 	/* userauth */
 
