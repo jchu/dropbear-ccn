@@ -483,26 +483,6 @@ ccn_publish_server_mountpoint()
         dropbear_exit("Could not register server mountpoint");
 }
 
-static void
-ccn_publish_client_connectpoint(size_t client_idx)
-{
-    int result;
-    struct ccn_charbuf *mountpoint;
-    char *client_uri = svr_opts.clients[client_idx];
-
-    mountpoint = ccn_charbuf_create();
-    if( mountpoint == NULL )
-        dropbear_exit("Failed to allocate server mountpoint charbuf");
-
-    result = ccn_name_from_uri(mountpoint,client_uri);
-    if( result < 0 )
-        dropbear_exit("Can't resolve client domain");
-
-    result = ccn_set_interest_filter(svr_opts.ssh_ccn,mountpoint,&authClientAction);
-    if( result < 0 )
-        dropbear_exit("Could not register client mountpoint");
-}
-
 /*
  * Incoming new interest on domain/ssh/client
  */
