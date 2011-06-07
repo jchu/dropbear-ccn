@@ -117,9 +117,15 @@ void loadhostkeys();
 
 typedef struct cli_runopts {
 
+    struct ccn* ssh_ccn;
+    char *ccnxdomain;
+    struct ccn_keystore *ccn_cached_keystore;
 	char *progname;
+#if 0
 	char *remotehost;
 	char *remoteport;
+#endif
+    char *remote_name_str;
 
 	char *own_user;
 	char *username;

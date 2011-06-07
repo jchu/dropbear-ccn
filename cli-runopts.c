@@ -35,7 +35,9 @@ cli_runopts cli_opts; /* GLOBAL */
 
 static void printhelp();
 static void parse_hostname(const char* orighostarg);
+#if 0
 static void parse_multihop_hostname(const char* orighostarg, const char* argv0);
+#endif
 static void fill_own_user();
 #ifdef ENABLE_CLI_PUBKEY_AUTH
 static void loadidentityfile(const char* filename);
@@ -50,13 +52,18 @@ static void add_netcat(const char *str);
 static void printhelp() {
 
 	fprintf(stderr, "Dropbear client v%s\n"
+#if 0
 #ifdef ENABLE_CLI_MULTIHOP
 					"Usage: %s [options] [user@]host[/port][,[user@]host/port],...] [command]\n"
 #else
 					"Usage: %s [options] [user@]host[/port] [command]\n"
 #endif
+#endif
+					"Usage: %s [options] [user@]host [command]\n"
 					"Options are:\n"
+#if 0
 					"-p <remoteport>\n"
+#endif
 					"-l <username>\n"
 					"-t    Allocate a pty\n"
 					"-T    Don't allocate a pty\n"
@@ -70,6 +77,7 @@ static void printhelp() {
 #ifdef ENABLE_CLI_AGENTFWD
 					"-A    Enable agent auth forwarding\n"
 #endif
+#if 0
 #ifdef ENABLE_CLI_LOCALTCPFWD
 					"-L <[listenaddress:]listenport:remotehost:remoteport> Local port forwarding\n"
 					"-g    Allow remote hosts to connect to forwarded ports\n"
@@ -77,14 +85,17 @@ static void printhelp() {
 #ifdef ENABLE_CLI_REMOTETCPFWD
 					"-R <[listenaddress:]listenport:remotehost:remoteport> Remote port forwarding\n"
 #endif
+#endif
 					"-W <receive_window_buffer> (default %d, larger may be faster, max 1MB)\n"
 					"-K <keepalive>  (0 is never, default %d)\n"
 					"-I <idle_timeout>  (0 is never, default %d)\n"
+#if 0
 #ifdef ENABLE_CLI_NETCAT
 					"-B <endhost:endport> Netcat-alike forwarding\n"
 #endif				
 #ifdef ENABLE_CLI_PROXYCMD
 					"-J <proxy_program> Use program pipe rather than TCP connection\n"
+#endif
 #endif
 #ifdef DEBUG_TRACE
 					"-v    verbose (compiled with DEBUG_TRACE)\n"
@@ -116,11 +127,15 @@ void cli_getopts(int argc, char ** argv) {
 	char* keepalive_arg = NULL;
 	char* idle_timeout_arg = NULL;
 	char *host_arg = NULL;
+    char *remote_arg = NULL;
 
 	/* see printhelp() for options */
 	cli_opts.progname = argv[0];
+#if 0
 	cli_opts.remotehost = NULL;
 	cli_opts.remoteport = NULL;
+#endif
+    cli_opts.remote_name_str = NULL;
 	cli_opts.username = NULL;
 	cli_opts.cmd = NULL;
 	cli_opts.no_cmd = 0;
@@ -207,9 +222,11 @@ void cli_getopts(int argc, char ** argv) {
 				case 'y': /* always accept the remote hostkey */
 					cli_opts.always_accept_key = 1;
 					break;
+#if 0
 				case 'p': /* remoteport */
 					next = &cli_opts.remoteport;
 					break;
+#endif
 #ifdef ENABLE_CLI_PUBKEY_AUTH
 				case 'i': /* an identityfile */
 					/* Keep scp happy when it changes "-i file" to "-ifile" */
@@ -322,6 +339,8 @@ void cli_getopts(int argc, char ** argv) {
 
 			if (host_arg == NULL) {
 				host_arg = argv[i];
+            } else if (remote_arg == NULL ) {
+                remote_arg = argv[i];
 			} else {
 
 				/* this is part of the commands to send - after this we
@@ -355,9 +374,11 @@ void cli_getopts(int argc, char ** argv) {
 		exit(EXIT_FAILURE);
 	}
 
+#if 0
 	if (cli_opts.remoteport == NULL) {
 		cli_opts.remoteport = "22";
 	}
+#endif
 
 	/* If not explicitly specified with -t or -T, we don't want a pty if
 	 * there's a command, but we do otherwise */
@@ -405,11 +426,15 @@ void cli_getopts(int argc, char ** argv) {
 	/* The hostname gets set up last, since
 	 * in multi-hop mode it will require knowledge
 	 * of other flags such as -i */
+#if 0
 #ifdef ENABLE_CLI_MULTIHOP
 	parse_multihop_hostname(host_arg, argv[0]);
 #else
 	parse_hostname(host_arg);
 #endif
+#endif
+	parse_hostname(host_arg);
+    cli_opts.ccnxdomain = remote_arg;
 }
 
 #ifdef ENABLE_CLI_PUBKEY_AUTH
@@ -433,6 +458,7 @@ static void loadidentityfile(const char* filename) {
 
 #ifdef ENABLE_CLI_MULTIHOP
 
+#if 0
 static char*
 multihop_passthrough_args() {
 	char *ret;
@@ -467,7 +493,9 @@ multihop_passthrough_args() {
 
 	return ret;
 }
+#endif
 
+#if 0
 /* Sets up 'onion-forwarding' connections. This will spawn
  * a separate dbclient process for each hop.
  * As an example, if the cmdline is
@@ -522,9 +550,11 @@ static void parse_multihop_hostname(const char* orighostarg, const char* argv0) 
 		if (cli_opts.proxycmd) {
 			dropbear_exit("-J can't be used with multihop mode");
 		}
+#if 0
 		if (cli_opts.remoteport == NULL) {
 			cli_opts.remoteport = "22";
 		}
+#endif
 		cmd_len = strlen(argv0) + strlen(remainder) 
 			+ strlen(cli_opts.remotehost) + strlen(cli_opts.remoteport)
 			+ strlen(passthrough_args)
@@ -542,22 +572,37 @@ static void parse_multihop_hostname(const char* orighostarg, const char* argv0) 
 	m_free(hostbuf);
 }
 #endif /* !ENABLE_CLI_MULTIHOP */
+#endif
 
 /* Parses a [user@]hostname[/port] argument. */
 static void parse_hostname(const char* orighostarg) {
 	char *userhostarg = NULL;
+#if 0
 	char *port = NULL;
+#endif
 
 	userhostarg = m_strdup(orighostarg);
 
+#if 0
 	cli_opts.remotehost = strchr(userhostarg, '@');
+    
 	if (cli_opts.remotehost == NULL) {
+#endif
+	cli_opts.remote_name_str = strchr(userhostarg, '@');
+	if (cli_opts.remote_name_str == NULL) {
 		/* no username portion, the cli-auth.c code can figure the
 		 * local user's name */
+#if 0
 		cli_opts.remotehost = userhostarg;
+#endif
+        cli_opts.remote_name_str = userhostarg;
 	} else {
+#if 0
 		cli_opts.remotehost[0] = '\0'; /* Split the user/host */
 		cli_opts.remotehost++;
+#endif
+		cli_opts.remote_name_str[0] = '\0'; /* Split the user/host */
+		cli_opts.remote_name_str++;
 		cli_opts.username = userhostarg;
 	}
 
@@ -565,13 +610,16 @@ static void parse_hostname(const char* orighostarg) {
 		cli_opts.username = m_strdup(cli_opts.own_user);
 	}
 
+#if 0
 	port = strchr(cli_opts.remotehost, '/');
 	if (port) {
 		*port = '\0';
 		cli_opts.remoteport = port+1;
 	}
-
 	if (cli_opts.remotehost[0] == '\0') {
+	if (cli_opts.svr_domain_str[0] == '\0') {
+#endif
+	if (cli_opts.remote_name_str[0] == '\0') {
 		dropbear_exit("Bad hostname");
 	}
 }
