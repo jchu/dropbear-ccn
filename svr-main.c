@@ -53,8 +53,10 @@ newClientHandler(struct ccn_closure *selfp,
         enum ccn_upcall_kind kind,
         struct ccn_upcall_info *info);
 
-static struct ccn_closure newClientAction = {
-        .p = &newClientHandler
+static struct ccn_closure
+newClientAction =
+{
+    .p = &newClientHandler
 };
 
 #if defined(DBMULTI_dropbear) || !defined(DROPBEAR_MULTI)
@@ -565,11 +567,10 @@ newClientHandler(struct ccn_closure *selfp,
         strcat(client_name_str,clientid_str);
         svr_opts.clients[conn_idx] = client_name_str;
 
-        ccn_publish_client_connectpoint(conn_idx);
-
-        result = ccn_wrap_content(info->interest_ccnb,
-                reply,reply_length,
-                client_mountid_str);
+        result = ccn_wrap_content(svr_opts.ccn_cached_keystore,
+                info->interest_ccnb,
+                clientid_str, strlen(clientid_str),
+                reply);
         if( ccn_put(info->h,reply->buf,reply->length) < 0 )
             dropbear_exit("Failed to reply to client");
         ccn_charbuf_destroy(&reply);

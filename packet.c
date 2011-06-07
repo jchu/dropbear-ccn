@@ -37,7 +37,9 @@
 
 #include "ccn-utils.h"
 
+#if 0
 static int read_packet_init();
+#endif
 static void make_mac(unsigned int seqno, const struct key_context_directional * key_state,
 		buffer * clear_buf, unsigned int clear_len, 
 		unsigned char *output_mac);
@@ -90,8 +92,11 @@ write_packet(struct ccn_upcall_info *info)
     if( ccn_name_append_components(remote_name,info->interest_ccnb,info->interest_comps->buf[0],info->interest_comps->buf[3]) < 0 )
         dropbear_exit("Could not create remote name");
 
-
-    if( ccn_wrap_content(remote_name,buf_getptr(writebuf,len),len,&send) < 0 )
+    if( ccn_wrap_content(ses.ccn_cached_keystore,
+                remote_name,
+                buf_getptr(writebuf,len),
+                len,
+                &send) < 0 )
         dropbear_exit("Failure packing packet into data");
 
     if( ccn_put(info->h,send->buf,send->length) < 0 )

@@ -118,6 +118,7 @@ void svr_session(int conn_idx) {
 			&svr_ses.remotehost, NULL, 1);
 #endif
     ses.ssh_ccn = svr_opts.ssh_ccn;
+    ses.ccn_cached_keystore = svr_opts.ccn_cached_keystore;
     ses.remote_name_str = svr_opts.clients[conn_idx];
     ses.remote_name = ccn_charbuf_create();
     if( ses.remote_name == NULL )
