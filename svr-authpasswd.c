@@ -90,13 +90,15 @@ void svr_auth_password() {
 		dropbear_log(LOG_NOTICE, 
 				"Password auth succeeded for '%s' from %s",
 				ses.authstate.pw_name,
-				svr_ses.addrstring);
+				//svr_ses.addrstring);
+				ses.remote_name_str);
 		send_msg_userauth_success();
 	} else {
 		dropbear_log(LOG_WARNING,
 				"Bad password attempt for '%s' from %s",
 				ses.authstate.pw_name,
-				svr_ses.addrstring);
+				//svr_ses.addrstring);
+				ses.remote_name_str);
 		send_msg_userauth_failure(0, 1);
 	}
 

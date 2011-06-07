@@ -39,6 +39,13 @@ static void authclear();
 static int checkusername(unsigned char *username, unsigned int userlen);
 static void send_msg_userauth_banner();
 
+enum ccn_upcall_res
+authClientHandler(struct ccn_closure *selfp, enum ccn_upcall_kind kind, struct ccn_upcall_info *info);
+
+static struct ccn_closure authClientAction = {
+        .p = &authClientHandler
+};
+
 /* initialise the first time for a session, resetting all parameters */
 void svr_authinitialise() {
 
@@ -223,7 +230,8 @@ static int checkusername(unsigned char *username, unsigned int userlen) {
 			/* the username needs resetting */
 			if (ses.authstate.username != NULL) {
 				dropbear_log(LOG_WARNING, "Client trying multiple usernames from %s",
-							svr_ses.addrstring);
+							//svr_ses.addrstring);
+							ses.remote_name_str);
 				m_free(ses.authstate.username);
 			}
 			authclear();
@@ -236,7 +244,8 @@ static int checkusername(unsigned char *username, unsigned int userlen) {
 		TRACE(("leave checkusername: user '%s' doesn't exist", username))
 		dropbear_log(LOG_WARNING,
 				"Login attempt for nonexistent user from %s",
-				svr_ses.addrstring);
+				//svr_ses.addrstring);
+                ses.remote_name_str);
 		send_msg_userauth_failure(0, 1);
 		return DROPBEAR_FAILURE;
 	}
@@ -357,7 +366,8 @@ void send_msg_userauth_failure(int partial, int incrfail) {
 			userstr = ses.authstate.pw_name;
 		}
 		dropbear_exit("Max auth tries reached - user '%s' from %s",
-				userstr, svr_ses.addrstring);
+				//userstr, svr_ses.addrstring);
+				userstr, ses.remote_name_str);
 	}
 	
 	TRACE(("leave send_msg_userauth_failure"))

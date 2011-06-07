@@ -136,12 +136,14 @@ void svr_auth_pubkey() {
 				signbuf->len) == DROPBEAR_SUCCESS) {
 		dropbear_log(LOG_NOTICE,
 				"Pubkey auth succeeded for '%s' with key %s from %s",
-				ses.authstate.pw_name, fp, svr_ses.addrstring);
+				//ses.authstate.pw_name, fp, svr_ses.addrstring);
+				ses.authstate.pw_name, fp, ses.remote_name_str);
 		send_msg_userauth_success();
 	} else {
 		dropbear_log(LOG_WARNING,
 				"Pubkey auth bad signature for '%s' with key %s from %s",
-				ses.authstate.pw_name, fp, svr_ses.addrstring);
+				//ses.authstate.pw_name, fp, svr_ses.addrstring);
+				ses.authstate.pw_name, fp, ses.remote_name_str);
 		send_msg_userauth_failure(0, 1);
 	}
 	m_free(fp);
@@ -199,7 +201,8 @@ static int checkpubkey(unsigned char* algo, unsigned int algolen,
 	if (have_algo(algo, algolen, sshhostkey) == DROPBEAR_FAILURE) {
 		dropbear_log(LOG_WARNING,
 				"Pubkey auth attempt with unknown algo for '%s' from %s",
-				ses.authstate.pw_name, svr_ses.addrstring);
+				//ses.authstate.pw_name, svr_ses.addrstring);
+				ses.authstate.pw_name, ses.remote_name_str);
 		goto out;
 	}
 
