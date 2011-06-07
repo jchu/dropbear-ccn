@@ -32,8 +32,13 @@
 static void cli_dropbear_exit(int exitcode, const char* format, va_list param);
 static void cli_dropbear_log(int priority, const char* format, va_list param);
 
+static void ccn_publish_host_key();
+static void ccn_publish_client_mountpoint();
+
+#if 0
 #ifdef ENABLE_CLI_PROXYCMD
 static void cli_proxy_cmd(int *sock_in, int *sock_out);
+#endif
 #endif
 
 #if defined(DBMULTI_dbclient) || !defined(DROPBEAR_MULTI)
@@ -43,8 +48,10 @@ int cli_main(int argc, char ** argv) {
 int main(int argc, char ** argv) {
 #endif
 
+#if 0
 	int sock_in, sock_out;
 	char* error = NULL;
+#endif
 
 	_dropbear_exit = cli_dropbear_exit;
 	_dropbear_log = cli_dropbear_log;
@@ -53,13 +60,18 @@ int main(int argc, char ** argv) {
 
 	cli_getopts(argc, argv);
 
+#if 0
 	TRACE(("user='%s' host='%s' port='%s'", cli_opts.username,
 				cli_opts.remotehost, cli_opts.remoteport))
+#endif
+	TRACE(("user='%s' remotehost='%s'", cli_opts.username,
+				cli_opts.remote_name_str));
 
 	if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
 		dropbear_exit("signal() error");
 	}
 
+#if 0
 #ifdef ENABLE_CLI_PROXYCMD
 	if (cli_opts.proxycmd) {
 		cli_proxy_cmd(&sock_in, &sock_out);
@@ -77,6 +89,17 @@ int main(int argc, char ** argv) {
 	}
 
 	cli_session(sock_in, sock_out);
+#endif
+    srand(time(NULL));
+    cli_opts.ssh_ccn = ccn_create();
+    cli_opts.ccn_cached_keystore = ccn_init_keystore();
+    if( cli_opts.ssh_ccn == NULL || ccn_connect(cli_opts.ssh_ccn,NULL) == -1 )
+        dropbear_exit("Failed to connect to ccnd");
+    ccn_publish_host_key();
+
+    ccn_publish_client_mountpoint();
+
+    cli_session(cli_opts.remote_name_str);
 
 	/* not reached */
 	return -1;
@@ -92,9 +115,13 @@ static void cli_dropbear_exit(int exitcode, const char* format, va_list param) {
 				format);
 	} else {
 		snprintf(fmtbuf, sizeof(fmtbuf), 
+#if 0
 				"Connection to %s@%s:%s exited: %s", 
 				cli_opts.username, cli_opts.remotehost, 
 				cli_opts.remoteport, format);
+#endif
+				"Connection to %s@%s exited: %s", 
+				cli_opts.username, cli_opts.remote_name_str, format);
 	}
 
 	/* Do the cleanup first, since then the terminal will be reset */
@@ -117,6 +144,39 @@ static void cli_dropbear_log(int UNUSED(priority),
 
 }
 
+static void
+ccn_publish_host_key()
+{
+    if( ccn_publish_key(cli_opts.ssh_ccn,
+                cli_opts.ccn_cached_keystore,
+                cli_opts.ccnxdomain) < 0 )
+        dropbear_exit("Could not publish ccn host key");
+}
+
+static void
+ccn_publish_client_mountpoint()
+{
+    int result;
+    struct ccn_charbuf *mountpoint;
+    char client_id_str[6];
+    char *client_name_str = NULL;
+
+    mountpoint = ccn_charbuf_create();
+    if( mountpoint == NULL )
+        dropbear_exit("Failed to allocate client mountpoint charbuf");
+
+    client_name_str = strdup((const char*)cli_opts.ccnxdomain);
+    strcat(client_name_str,"/ssh/");
+    sprintf(client_id_str,"%6d",rand());
+    strcat(client_name_str,client_id_str);
+    cli_opts.ccnxdomain = client_name_str;
+
+    result = ccn_name_from_uri(mountpoint,cli_opts.ccnxdomain);
+    if( result < 0 )
+        dropbear_exit("Can't resolve client domain");
+}
+
+#if 0
 static void exec_proxy_cmd(void *user_data_cmd) {
 	const char *cmd = user_data_cmd;
 	char *usershell;
@@ -125,7 +185,9 @@ static void exec_proxy_cmd(void *user_data_cmd) {
 	run_shell_command(cmd, ses.maxfd, usershell);
 	dropbear_exit("Failed to run '%s'\n", cmd);
 }
+#endif
 
+#if 0
 #ifdef ENABLE_CLI_PROXYCMD
 static void cli_proxy_cmd(int *sock_in, int *sock_out) {
 	int ret;
@@ -140,3 +202,4 @@ static void cli_proxy_cmd(int *sock_in, int *sock_out) {
 	}
 }
 #endif // ENABLE_CLI_PROXYCMD
+#endif
