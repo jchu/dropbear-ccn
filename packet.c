@@ -35,6 +35,8 @@
 #include "auth.h"
 #include "channel.h"
 
+#include "ccn-utils.h"
+
 static int read_packet_init();
 static void make_mac(unsigned int seqno, const struct key_context_directional * key_state,
 		buffer * clear_buf, unsigned int clear_len, 
@@ -49,12 +51,15 @@ static void buf_compress(buffer * dest, buffer * src, unsigned int len);
 #endif
 
 /* non-blocking function writing out a current encrypted packet */
-void write_packet() {
-
-	int len, written;
+void
+write_packet(struct ccn_upcall_info *info)
+{
+	int len;
 	buffer * writebuf = NULL;
 	time_t now;
 	unsigned packet_type;
+    struct ccn_charbuf *remote_name;
+    struct ccn_charbuf *send;
 	
 	TRACE(("enter write_packet"))
 	dropbear_assert(!isempty(&ses.writequeue));
@@ -67,6 +72,7 @@ void write_packet() {
 	packet_type = writebuf->data[writebuf->len-1];
 	len = writebuf->len - 1 - writebuf->pos;
 	dropbear_assert(len > 0);
+#if 0
 	/* Try to write as much as possible */
 	written = write(ses.sock_out, buf_getptr(writebuf, len), len);
 
@@ -78,7 +84,19 @@ void write_packet() {
 			dropbear_exit("Error writing");
 		}
 	} 
-	
+#endif
+    remote_name = ccn_charbuf_create();
+    ccn_name_init(remote_name);
+    if( ccn_name_append_components(remote_name,info->interest_ccnb,info->interest_comps->buf[0],info->interest_comps->buf[3]) < 0 )
+        dropbear_exit("Could not create remote name");
+
+
+    if( ccn_wrap_content(remote_name,buf_getptr(writebuf,len),len,&send) < 0 )
+        dropbear_exit("Failure packing packet into data");
+
+    if( ccn_put(info->h,send->buf,send->length) < 0 )
+        dropbear_exit("Error writing");
+
 	now = time(NULL);
 	ses.last_trx_packet_time = now;
 
@@ -86,19 +104,23 @@ void write_packet() {
 		ses.last_packet_time = now;
 	}
 
+#if 0
 	if (written == 0) {
 		ses.remoteclosed();
 	}
 
 	if (written == len) {
+#endif
 		/* We've finished with the packet, free it */
 		dequeue(&ses.writequeue);
 		buf_free(writebuf);
 		writebuf = NULL;
+#if 0
 	} else {
 		/* More packet left to write, leave it in the queue for later */
 		buf_incrpos(writebuf, written);
 	}
+#endif
 
 	TRACE(("leave write_packet"))
 }
@@ -106,15 +128,17 @@ void write_packet() {
 /* Non-blocking function reading available portion of a packet into the
  * ses's buffer, decrypting the length if encrypted, decrypting the
  * full portion if possible */
-void read_packet() {
+void read_packet(struct ccn_upcall_info *info) {
 
 	int len;
-	unsigned int maxlen;
+	size_t maxlen;
+    size_t written;
 	unsigned char blocksize;
 
 	TRACE(("enter read_packet"))
 	blocksize = ses.keys->recv.algo_crypt->blocksize;
-	
+
+#if 0
 	if (ses.readbuf == NULL || ses.readbuf->len < blocksize) {
 		int ret;
 		/* In the first blocksize of a packet */
@@ -138,7 +162,6 @@ void read_packet() {
 	if (len == 0) {
 		ses.remoteclosed();
 	}
-
 	if (len < 0) {
 		if (errno == EINTR || errno == EAGAIN) {
 			TRACE(("leave read_packet: EINTR or EAGAIN"))
@@ -147,18 +170,28 @@ void read_packet() {
 			dropbear_exit("Error reading: %s", strerror(errno));
 		}
 	}
+#endif
+	maxlen = ses.readbuf->len - ses.readbuf->pos;
+
+    if( ccn_unwrap_content(info,ses.readbuf,maxlen,&written) < 0 )
+        dropbear_exit("Error unwrapping content");
 
 	buf_incrpos(ses.readbuf, len);
 
+#if 0
 	if ((unsigned int)len == maxlen) {
+#endif
 		/* The whole packet has been read */
 		decrypt_packet();
 		/* The main select() loop process_packet() to
 		 * handle the packet contents... */
+#if 0
 	}
+#endif
 	TRACE(("leave read_packet"))
 }
 
+#if 0
 /* Function used to read the initial portion of a packet, and determine the
  * length. Only called during the first BLOCKSIZE of a packet. */
 /* Returns DROPBEAR_SUCCESS if the length is determined, 
@@ -231,6 +264,7 @@ static int read_packet_init() {
 	buf_setpos(ses.readbuf, blocksize);
 	return DROPBEAR_SUCCESS;
 }
+#endif
 
 /* handle the received packet */
 void decrypt_packet() {
