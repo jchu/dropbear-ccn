@@ -79,6 +79,7 @@ void svr_session(int sock, int childpipe) {
 	char *host, *port;
 #endif
 void svr_session(int conn_idx) {
+    int result;
 #if 0
 	size_t len;
 #endif
@@ -88,17 +89,18 @@ void svr_session(int conn_idx) {
 #if 0
 	common_session_init(sock, sock);
 #endif
+	common_session_init();
 
 	/* Initialise server specific parts of the session */
 #if 0
 	svr_ses.childpipe = childpipe;
-#endif
     svr_ses.conn_idx = conn_idx;
+#endif
 #ifdef __uClinux__
 	svr_ses.server_pid = getpid();
 #endif
 	svr_authinitialise();
-	chaninitialise(svr_chantypes);
+	chaninitialise(svr_chantypes); // TODO: Figure out what listeners do
 	svr_chansessinitialise();
 
 	ses.connect_time = time(NULL);
@@ -115,6 +117,16 @@ void svr_session(int conn_idx) {
 	get_socket_address(ses.sock_in, NULL, NULL, 
 			&svr_ses.remotehost, NULL, 1);
 #endif
+    ses.ssh_ccn = svr_opts.ssh_ccn;
+    ses.remote_name_str = svr_opts.clients[conn_idx];
+    ses.remote_name = ccn_charbuf_create();
+    if( ses.remote_name == NULL )
+        dropbear_exit("Failed to allocate server mountpoint charbuf");
+
+    result = ccn_name_from_uri(ses.remote_name,ses.remote_name_str);
+    if( result < 0 )
+        dropbear_exit("Can't resolve client domain");
+
 	/* set up messages etc */
 	ses.remoteclosed = svr_remoteclosed;
 
@@ -138,10 +150,9 @@ void svr_session(int conn_idx) {
 #if 0
 	session_loop(NULL);
 #endif
-    ccn_run(svr_opts.ssh_ccn,-1);
+    ccn_run(ses.ssh_ccn,-1);
 
 	/* Not reached */
-
 }
 
 /* failure exit - format must be <= 100 chars */
@@ -230,11 +241,12 @@ void svr_dropbear_log(int priority, const char* format, va_list param) {
 
 /* called when the remote side closes the connection */
 static void svr_remoteclosed() {
-
+#if 0
 	m_close(ses.sock_in);
 	m_close(ses.sock_out);
 	ses.sock_in = -1;
 	ses.sock_out = -1;
+#endif
 	dropbear_close("Exited normally");
 
 }

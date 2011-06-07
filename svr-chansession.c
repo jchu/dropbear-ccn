@@ -254,7 +254,8 @@ static struct logininfo*
 chansess_login_alloc(struct ChanSess *chansess) {
 	struct logininfo * li;
 	li = login_alloc_entry(chansess->pid, ses.authstate.username,
-			svr_ses.remotehost, chansess->tty);
+			//svr_ses.remotehost, chansess->tty);
+			ses.remote_name_str, chansess->tty);
 	return li;
 }
 
@@ -578,6 +579,7 @@ static int sessionpty(struct ChanSess * chansess) {
 }
 
 static char* make_connection_string() {
+#if 0
 	char *local_ip, *local_port, *remote_ip, *remote_port;
 	size_t len;
 	char *ret;
@@ -589,6 +591,11 @@ static char* make_connection_string() {
 	m_free(local_port);
 	m_free(remote_ip);
 	m_free(remote_port);
+#endif
+	size_t len;
+	char *ret;
+    len = strlen(ses.remote_name_str) + strlen(ses.local_name_str) + 2;
+    sprintf(ret, len, "%s %s", ses.remote_name_str, ses.local_name_str);
 	return ret;
 }
 

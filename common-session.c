@@ -36,9 +36,11 @@
 #include "atomicio.h"
 #include "runopts.h"
 
+#if 0
 static void checktimeouts();
 static long select_timeout();
 static int ident_readln(int fd, char* buf, int count);
+#endif
 
 struct sshsession ses; /* GLOBAL */
 
@@ -49,7 +51,16 @@ int sessinitdone = 0; /* GLOBAL */
 /* this is set when we get SIGINT or SIGTERM, the handler is in main.c */
 int exitflag = 0; /* GLOBAL */
 
+static enum ccn_upcall_res
+remoteIdentHandler(struct ccn_closure *selfp,
+        enum ccn_upcall_kind kind,
+        struct ccn_upcall_info *info);
 
+static struct ccn_closure
+remoteIdentAction =
+{
+    .p = &remoteIdentHandler
+};
 
 /* called only at the start of a session, set up initial state */
 #if 0
@@ -134,8 +145,8 @@ void common_session_init() {
 	TRACE(("leave session_init"))
 }
 
+#if 0
 void session_loop(void(*loophandler)()) {
-
 	fd_set readfd, writefd;
 	struct timeval timeout;
 	int val;
@@ -230,6 +241,7 @@ void session_loop(void(*loophandler)()) {
 	
 	/* Not reached */
 }
+#endif
 
 /* clean up a session on exit */
 void common_session_cleanup() {
@@ -253,6 +265,7 @@ void common_session_cleanup() {
 
 
 void session_identification() {
+#if 0
 
 	/* max length of 255 chars */
 	char linebuf[256];
@@ -298,9 +311,20 @@ void session_identification() {
 	}
 
 	TRACE(("remoteident: %s", ses.remoteident))
+#endif
 
+    // Send out a new interest for session_id
+    // sessionIdHandler takes care of comparison
+    int result;
+
+    struct ccn_charbuf *templ = ccn_make_generic_template();
+    result = ccn_express_interest(ses.ssh_ccn,ses.remote_name,
+            &remoteIdentAction, templ);
+    if( result < 0 )
+        dropbear_exit("Failed to express interest for ession id (res == %d)",result);
 }
 
+#if 0
 /* returns the length including null-terminating zero on success,
  * or -1 on failure */
 static int ident_readln(int fd, char* buf, int count) {
@@ -374,6 +398,7 @@ static int ident_readln(int fd, char* buf, int count) {
 	TRACE(("leave ident_readln: return %d", pos+1))
 	return pos+1;
 }
+#endif
 
 void send_msg_ignore() {
 	CHECKCLEARTOWRITE();
@@ -382,6 +407,7 @@ void send_msg_ignore() {
 	encrypt_packet();
 }
 
+#if 0
 /* Check all timeouts which are required. Currently these are the time for
  * user authentication, and the automatic rekeying. */
 static void checktimeouts() {
@@ -431,6 +457,7 @@ static long select_timeout() {
         ret = MIN(opts.idle_timeout_secs, ret);
 	return ret;
 }
+#endif
 
 const char* get_user_shell() {
 	/* an empty shell should be interpreted as "/bin/sh" */
@@ -463,3 +490,65 @@ void fill_passwd(const char* username) {
 	ses.authstate.pw_passwd = m_strdup(pw->pw_passwd);
 }
 
+static enum ccn_upcall_res
+remoteIdentHandler(struct ccn_closure *selfp,
+        enum ccn_upcall_kind kind,
+        struct ccn_upcall_info *info)
+{
+
+    switch (kind) {
+        case CCN_UPCALL_INTEREST:
+            return send_ident(info);
+        case CCN_UPCALL_CONTENT:
+            return verify_ident(info);
+        default:
+            return CCN_UPCALL_RESULT_ERR;
+    }
+    return CCN_UPCALL_RESULT_ERR;
+}
+
+enum ccn_upcall_res
+send_ident(struct ccn_upcall_info *info)
+{
+    int result;
+
+    struct ccn_charbuf *reply = NULL;
+    size_t reply_length = 0;
+
+    result = ccn_wrap_content(info->interest_ccnb,
+            reply,reply_length,LOCAL_IDENT "\r\n");
+    if( ccn_put(info->h,reply->buf,reply->length) < 0 )
+        dropbear_exit("Failed to reply with ident");
+
+    return CCN_UPCALL_RESULT_INTEREST_CONSUMED;
+}
+
+enum ccn_upcall_res
+verify_ident(struct ccn_upcall_info *info)
+{
+    int result;
+
+    unsigned char ident_reply = NULL;
+    size_t ident_reply_length = 0;
+    result = ccn_unwrap_content(info,&ident_reply,&ident_reply_length);
+    if( result < 0 )
+        dropbear_exit("Failed to parse ident reply");
+
+    // Parse out ident line
+    char* ident_line = strstr((const char*)&ident_reply,"SSH-");
+    if( ident_line == NULL )
+        dropbear_exit("Failed to find ident in reply");
+
+    char* newline = strstr(ident_line,"\n");
+    memcpy(ses.remoteident, ident_line, newline - ident_line);
+
+	/* Shall assume that 2.x will be backwards compatible. */
+	if (strncmp(ses.remoteident, "SSH-2.", 6) != 0
+			&& strncmp(ses.remoteident, "SSH-1.99-", 9) != 0) {
+		dropbear_exit("Incompatible remote version '%s'", ses.remoteident);
+	}
+
+	TRACE(("remoteident: %s", ses.remoteident));
+
+    return CCN_UPCALL_RESULT_OK;
+}
