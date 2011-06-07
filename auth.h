@@ -40,16 +40,6 @@ void svr_auth_password();
 void svr_auth_pubkey();
 void svr_auth_pam();
 
-static enum ccn_upcall_res
-authClientHandler(struct ccn_closure *selfp,
-        enum ccn_upcall_kind kind,
-        struct ccn_upcall_info *info);
-
-static struct ccn_closure authClientAction = {
-        .p = &authClientHandler
-};
-
-
 #ifdef ENABLE_SVR_PUBKEY_OPTIONS
 int svr_pubkey_allows_agentfwd();
 int svr_pubkey_allows_tcpfwd();
