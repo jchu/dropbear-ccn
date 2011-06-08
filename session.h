@@ -62,7 +62,10 @@ void svr_dropbear_exit(int exitcode, const char* format, va_list param);
 void svr_dropbear_log(int priority, const char* format, va_list param);
 
 /* Client */
+#if 0
 void cli_session(int sock_in, int sock_out);
+#endif
+void cli_session(char *remote_name_str);
 void cli_session_cleanup();
 void cleantext(unsigned char* dirtytext);
 

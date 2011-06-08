@@ -38,7 +38,9 @@
 #include "agentfwd.h"
 
 static void cli_remoteclosed();
+#if 0
 static void cli_sessionloop();
+#endif
 static void cli_session_init();
 static void cli_finished();
 
@@ -82,18 +84,24 @@ static const struct ChanType *cli_chantypes[] = {
 	NULL /* Null termination */
 };
 
+#if 0
 void cli_session(int sock_in, int sock_out) {
+#endif
+void cli_session(char * remote_name_str) {
 
 	seedrandom();
 
 	crypto_init();
 
+#if 0
 	common_session_init(sock_in, sock_out);
+#endif
+	common_session_init();
 
 	chaninitialise(cli_chantypes);
 
 	/* Set up cli_ses vars */
-	cli_session_init();
+	cli_session_init(remote_name_str);
 
 	/* Ready to go */
 	sessinitdone = 1;
@@ -103,13 +111,17 @@ void cli_session(int sock_in, int sock_out) {
 
 	send_msg_kexinit();
 
+#if 0
 	session_loop(cli_sessionloop);
+#endif
+    ccn_run(ses.ssh_ccn,-1);
 
 	/* Not reached */
 
 }
 
-static void cli_session_init() {
+static void cli_session_init(char *remote_name_str) {
+    int result;
 
 	cli_ses.state = STATE_NOTHING;
 	cli_ses.kex_state = KEX_NOTHING;
@@ -141,8 +153,20 @@ static void cli_session_init() {
 	ses.packettypes = cli_packettypes;
 
 	ses.isserver = 0;
+
+    ses.ssh_ccn = cli_opts.ssh_ccn;
+    ses.ccn_cached_keystore = cli_opts.ccn_cached_keystore;
+    ses.remote_name_str = remote_name_str;
+    ses.remote_name = ccn_charbuf_create();
+    if( ses.remote_name == NULL)
+        dropbear_exit("Failed to allocate server mountpoint charbuf");
+
+    result = ccn_name_from_uri(ses.remote_name,ses.remote_name_str);
+    if( result < 0 )
+        dropbear_exit("Can't resolve server uri");
 }
 
+#if 0
 /* This function drives the progress of the session - it initiates KEX,
  * service, userauth and channel requests */
 static void cli_sessionloop() {
@@ -262,6 +286,7 @@ static void cli_sessionloop() {
 	TRACE(("leave cli_sessionloop: fell out"))
 
 }
+#endif
 
 void cli_session_cleanup() {
 
@@ -283,8 +308,12 @@ static void cli_finished() {
 
 	cli_session_cleanup();
 	common_session_cleanup();
+#if 0
 	fprintf(stderr, "Connection to %s@%s:%s closed.\n", cli_opts.username,
 			cli_opts.remotehost, cli_opts.remoteport);
+#endif
+	fprintf(stderr, "Connection to %s@%s closed.\n", cli_opts.username,
+			cli_opts.remote_name_str);
 	exit(cli_ses.retval);
 }
 
@@ -294,10 +323,12 @@ static void cli_remoteclosed() {
 
 	/* XXX TODO perhaps print a friendlier message if we get this but have
 	 * already sent/received disconnect message(s) ??? */
+#if 0
 	m_close(ses.sock_in);
 	m_close(ses.sock_out);
 	ses.sock_in = -1;
 	ses.sock_out = -1;
+#endif
 	dropbear_exit("Remote closed the connection");
 }
 
