@@ -30,6 +30,10 @@
 #include "runopts.h"
 #include "random.h"
 
+#include "ccn-utils.h"
+
+#define DEBUG_NOFORK
+
 #if 0
 static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
 #endif
@@ -412,6 +416,7 @@ static void commonsetup() {
 	loadhostkeys();
 #endif
 
+    srand(time(NULL));
     svr_opts.ssh_ccn = ccn_create();
     svr_opts.ccn_cached_keystore = ccn_init_keystore();
     if( svr_opts.ssh_ccn == NULL || ccn_connect(svr_opts.ssh_ccn,NULL) == -1 )
@@ -457,6 +462,7 @@ static size_t listensockets(int *sock, size_t sockcount, int *maxfd) {
 static void
 ccn_publish_host_key()
 {
+    dropbear_log(LOG_WARNING,"Enter ccn_publish_host_key");
     if( ccn_publish_key(svr_opts.ssh_ccn,
                 svr_opts.ccn_cached_keystore,
                 svr_opts.ccnxdomain) < 0 )
@@ -466,6 +472,7 @@ ccn_publish_host_key()
 static void
 ccn_publish_server_mountpoint()
 {
+    dropbear_log(LOG_WARNING,"Enter ccn_publish_server_mountpoint");
     int result;
     struct ccn_charbuf *mountpoint;
 
@@ -480,6 +487,8 @@ ccn_publish_server_mountpoint()
     ccn_name_append_str(mountpoint,"ssh");
     ccn_name_append_str(mountpoint,"client");
 
+    dropbear_log(LOG_WARNING,"Listening at");
+    print_ccnb_charbuf(mountpoint);
     result = ccn_set_interest_filter(svr_opts.ssh_ccn,mountpoint,&newClientAction);
     if( result < 0 )
         dropbear_exit("Could not register server mountpoint");
@@ -493,6 +502,8 @@ newClientHandler(struct ccn_closure *selfp,
         enum ccn_upcall_kind kind,
         struct ccn_upcall_info *info)
 {
+    dropbear_log(LOG_WARNING,"Enter newClientHandler");
+    dropbear_log(LOG_WARNING,"Got interest matching %d components, kind = %d\n", info->matched_comps, kind);
     int result;
 	pid_t fork_ret = 0;
     int child_stat_loc;
@@ -500,12 +511,14 @@ newClientHandler(struct ccn_closure *selfp,
 
     const unsigned char *client_domain = NULL;
     size_t client_domain_length = 0;
-    unsigned char *client_name_str = NULL;
+    char *client_name_str = NULL;
     char clientid_str[6];
     unsigned char *client_mountid_str = NULL;
 
     struct ccn_charbuf *reply = NULL;
     size_t reply_length = 0;
+
+    struct ccn_charbuf *reply_name = NULL;
 
 
     if (exitflag) {
@@ -530,6 +543,11 @@ newClientHandler(struct ccn_closure *selfp,
         default:
             return CCN_UPCALL_RESULT_ERR;
     }
+
+    dropbear_log(LOG_WARNING,"Interest from");
+    print_ccnb_name(info);
+
+    dropbear_log(LOG_WARNING,"newClientHandler: fork 1");
 
 #ifdef DEBUG_NOFORK
     fork_ret = 0;
@@ -561,20 +579,33 @@ newClientHandler(struct ccn_closure *selfp,
                 &client_domain, &client_domain_length) < 0 )
             dropbear_exit("Error parsing client ccn domain");
 
-        client_name_str = strdup((const char *)client_domain);
+        client_name_str = strdup((const char *)svr_opts.ccnxdomain);
 
         sprintf(clientid_str,"%6d",rand());
+        strcat(client_name_str,"/");
         strcat(client_name_str,clientid_str);
         svr_opts.clients[conn_idx] = client_name_str;
 
-        result = ccn_wrap_content(svr_opts.ccn_cached_keystore,
+        reply_name = ccn_charbuf_create();
+        ccn_name_init(reply_name);
+        ccn_name_append_components(reply_name,
                 info->interest_ccnb,
-                clientid_str, strlen(clientid_str),
-                reply);
+                info->interest_comps->buf[0],
+                info->interest_comps->buf[4]);
+
+        dropbear_log(LOG_WARNING,"newClientHandler: replying with new client mountpoint");
+        result = ccn_wrap_content(svr_opts.ccn_cached_keystore,
+                reply_name,
+                client_name_str, strlen(client_name_str),
+                &reply);
+        dropbear_log(LOG_WARNING,"Reply to client");
+        print_ccnb_charbuf(reply_name);
+        dropbear_log(LOG_WARNING,"with: %s",client_name_str);
         if( ccn_put(info->h,reply->buf,reply->length) < 0 )
             dropbear_exit("Failed to reply to client");
         ccn_charbuf_destroy(&reply);
 
+        dropbear_log(LOG_WARNING,"newClientHandler: fork 2");
         #ifdef DEBUG_NOFORK
             fork_ret = 0;
         #else
@@ -592,6 +623,7 @@ newClientHandler(struct ccn_closure *selfp,
 		monstartup((u_long)&_start, (u_long)&etext);
 #endif /* DEBUG_FORKGPROF */
             /* Start session and never return */
+            dropbear_log(LOG_WARNING,"Start new session for client");
             svr_session(conn_idx);
             dropbear_assert(0);
         }
@@ -600,4 +632,5 @@ newClientHandler(struct ccn_closure *selfp,
     }
     /* Should not get here */
     dropbear_assert(0);
+    return CCN_UPCALL_RESULT_ERR;
 }

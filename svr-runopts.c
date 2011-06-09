@@ -108,6 +108,7 @@ static void printhelp(const char * progname) {
 }
 
 void svr_getopts(int argc, char ** argv) {
+    dropbear_log(LOG_WARNING,"Enter svr_getopts");
 
 	unsigned int i;
 	char ** next = 0;
@@ -186,6 +187,7 @@ void svr_getopts(int argc, char ** argv) {
 		}
 
 		if (argv[i][0] == '-') {
+            dropbear_log(LOG_WARNING,"flag detected");
 			switch (argv[i][1]) {
 				case 'b':
 					next = &svr_opts.bannerfile;
@@ -229,6 +231,7 @@ void svr_getopts(int argc, char ** argv) {
 					break;
 #endif
 				case 'p':
+                  dropbear_log(LOG_WARNING,"Detected p flag");
 				  nextisccnx = 1;
 				  break;
 				case 'P':
@@ -382,6 +385,7 @@ static void addportandaddress(char* spec) {
 static void
 addccnxuri(char* spec)
 {
+    dropbear_log(LOG_WARNING,"Enter addccnxuri");
     char *myspec = NULL;
 
     if( spec == NULL )
@@ -390,6 +394,8 @@ addccnxuri(char* spec)
     myspec = m_strdup(spec);
 
     svr_opts.ccnxdomain = myspec;
+    dropbear_log(LOG_WARNING,"ccnxdomain:");
+    dropbear_log(LOG_WARNING,svr_opts.ccnxdomain);
 }
 
 #if 0

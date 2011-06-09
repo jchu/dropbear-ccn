@@ -79,6 +79,7 @@ void svr_session(int sock, int childpipe) {
 	char *host, *port;
 #endif
 void svr_session(int conn_idx) {
+    dropbear_log(LOG_WARNING,"Enter svr_session");
     int result;
 #if 0
 	size_t len;

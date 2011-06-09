@@ -68,6 +68,7 @@ void common_session_init(int sock_in, int sock_out) {
 #endif
 void common_session_init() {
 
+    dropbear_log(LOG_WARNING,"Enter common_session_init");
 	TRACE(("enter session_init"))
 
 #if 0
@@ -265,6 +266,7 @@ void common_session_cleanup() {
 
 
 void session_identification() {
+    dropbear_log(LOG_WARNING,"Enter session_identification");
 #if 0
 
 	/* max length of 255 chars */

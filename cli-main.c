@@ -29,6 +29,8 @@
 #include "runopts.h"
 #include "session.h"
 
+#include "ccn-utils.h"
+
 static void cli_dropbear_exit(int exitcode, const char* format, va_list param);
 static void cli_dropbear_log(int priority, const char* format, va_list param);
 
@@ -162,6 +164,7 @@ static void cli_dropbear_log(int UNUSED(priority),
 static void
 ccn_publish_host_key()
 {
+    dropbear_log(LOG_WARNING,"Enter ccn_publish_host_key");
     if( ccn_publish_key(cli_opts.ssh_ccn,
                 cli_opts.ccn_cached_keystore,
                 cli_opts.ccnxdomain) < 0 )
@@ -171,6 +174,7 @@ ccn_publish_host_key()
 static void
 ccn_publish_client_mountpoint()
 {
+    dropbear_log(LOG_WARNING,"Enter ccn_publish_client_mountpoint");
     int result;
     struct ccn_charbuf *mountpoint;
     char client_id_str[6];
@@ -189,6 +193,10 @@ ccn_publish_client_mountpoint()
     result = ccn_name_from_uri(mountpoint,cli_opts.ccnxdomain);
     if( result < 0 )
         dropbear_exit("Can't resolve client domain");
+
+    dropbear_log(LOG_WARNING,"Listening at");
+    print_ccnb_charbuf(mountpoint);
+    result = ccn_set_interest_filter(cli_opts.ssh_ccn,mountpoint,&newServerAction);
 }
 
 #if 0
@@ -222,6 +230,7 @@ static void cli_proxy_cmd(int *sock_in, int *sock_out) {
 void
 ccn_ssh_connect(char *remote_name_str)
 {
+    dropbear_log(LOG_WARNING,"Enter ccn_ssh_connect");
     int result;
     struct ccn_charbuf *remote_name;
 /*
@@ -238,8 +247,8 @@ ccn_ssh_connect(char *remote_name_str)
     if( result < 0 )
         dropbear_exit("Could not parse server uri");
 
-    ccn_name_append_str(remote_name,"ssh/client");
-
+    ccn_name_append_str(remote_name,"ssh");
+    ccn_name_append_str(remote_name,"client");
 
     /*
     server_pkey = ssh_ccn_retrieve_public_key(
@@ -258,6 +267,9 @@ ccn_ssh_connect(char *remote_name_str)
     ccn_name_append(remote_name,encrypted_local_name);
     */
     ccn_name_append(remote_name,cli_opts.ccnxdomain,strlen(cli_opts.ccnxdomain));
+
+    dropbear_log(LOG_WARNING,"Connecting to remote:");
+    print_ccnb_charbuf(remote_name);
 
     connect_template = make_connect_template();
 
@@ -279,6 +291,8 @@ newServerHandler(struct ccn_closure *selfp,
         enum ccn_upcall_kind kind,
         struct ccn_upcall_info *info)
 {
+    dropbear_log(LOG_WARNING,"Enter newServerHandler");
+    dropbear_log(LOG_WARNING,"Got interest matching %d components, kind = %d\n", info->matched_comps, kind);
     int result;
 
     const unsigned char *ccnb = NULL;
@@ -290,9 +304,17 @@ newServerHandler(struct ccn_closure *selfp,
     switch (kind) {
         case CCN_UPCALL_CONTENT:
             break;
+        case CCN_UPCALL_INTEREST_TIMED_OUT:
+            return CCN_UPCALL_RESULT_REEXPRESS;
+        case CCN_UPCALL_CONTENT_UNVERIFIED:
+            // TODO: fix verification
+            break;
         default:
             return CCN_UPCALL_RESULT_ERR;
     }
+
+    dropbear_log(LOG_WARNING,"Interest to");
+    print_ccnb_name(info);
 
     ccnb = info->content_ccnb;
     ccnb_size = info->pco->offset[CCN_PCO_E];
@@ -301,18 +323,24 @@ newServerHandler(struct ccn_closure *selfp,
     if( result < 0 )
         dropbear_exit("Could not parse reply message");
 
-    if( strncmp((char *)data,"ccnx://",7) != 0 ) {
+    dropbear_log(LOG_WARNING,"newServerHandler: parsing contents");
+    if( strncmp((char *)data,"ccnx:/",6) == 0 ) {
         cli_opts.remote_name_str = (char *)data;
+        dropbear_log(LOG_WARNING,"newServerHandler: matches: %s (%d)",data,data_size);
         ses.remote_name = ccn_charbuf_create();
-        result = ccn_name_from_uri(ses.remote_name,ses.remote_name_str);
+        result = ccn_name_from_uri(ses.remote_name,cli_opts.remote_name_str);
         if( result < 0 )
             dropbear_exit("Did not find expected uri in server response");
 
         // Start a new session
+        dropbear_log(LOG_WARNING,"Connected to server at");
+        print_ccnb_charbuf(ses.remote_name);
+        
         cli_session(cli_opts.remote_name_str);
 
         return CCN_UPCALL_RESULT_OK;
     } else {
+        dropbear_log(LOG_WARNING,"newServerHandler: doesn't match");
         return CCN_UPCALL_RESULT_ERR;
     }
 }

@@ -106,6 +106,7 @@ static void printhelp() {
 }
 
 void cli_getopts(int argc, char ** argv) {
+    dropbear_log(LOG_WARNING,"Enter cli_getopts");
 	unsigned int i, j;
 	char ** next = 0;
 	unsigned int cmdlen;
@@ -217,6 +218,7 @@ void cli_getopts(int argc, char ** argv) {
 
 		if (argv[i][0] == '-') {
 			/* A flag *waves* */
+            dropbear_log(LOG_WARNING,"cli_runopts: flag detected");
 
 			switch (argv[i][1]) {
 				case 'y': /* always accept the remote hostkey */
@@ -435,6 +437,8 @@ void cli_getopts(int argc, char ** argv) {
 #endif
 	parse_hostname(host_arg);
     cli_opts.ccnxdomain = remote_arg;
+    dropbear_log(LOG_WARNING,"cli_runops ccnxdomain:");
+    dropbear_log(LOG_WARNING,cli_opts.ccnxdomain);
 }
 
 #ifdef ENABLE_CLI_PUBKEY_AUTH
@@ -576,6 +580,7 @@ static void parse_multihop_hostname(const char* orighostarg, const char* argv0) 
 
 /* Parses a [user@]hostname[/port] argument. */
 static void parse_hostname(const char* orighostarg) {
+    dropbear_log(LOG_WARNING,"Enter parse_hostname");
 	char *userhostarg = NULL;
 #if 0
 	char *port = NULL;
@@ -622,6 +627,8 @@ static void parse_hostname(const char* orighostarg) {
 	if (cli_opts.remote_name_str[0] == '\0') {
 		dropbear_exit("Bad hostname");
 	}
+    dropbear_log(LOG_WARNING,"parse_hostname remote name:");
+    dropbear_log(LOG_WARNING,cli_opts.remote_name_str);
 }
 
 #ifdef ENABLE_CLI_NETCAT

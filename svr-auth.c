@@ -48,7 +48,7 @@ static struct ccn_closure authClientAction = {
 
 /* initialise the first time for a session, resetting all parameters */
 void svr_authinitialise() {
-
+    dropbear_log(LOG_WARNING,"Enter svr_authinitialise");
 	ses.authstate.failcount = 0;
 	ses.authstate.pw_name = NULL;
 	ses.authstate.pw_dir = NULL;

@@ -969,7 +969,7 @@ const struct ChanType svrchansess = {
 /* Set up the general chansession environment, in particular child-exit
  * handling */
 void svr_chansessinitialise() {
-
+    dropbear_log(LOG_WARNING,"Enter svr_chansessinitialise");
 	struct sigaction sa_chld;
 
 	/* single child process intially */
