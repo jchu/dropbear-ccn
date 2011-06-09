@@ -34,6 +34,18 @@ static void cli_dropbear_log(int priority, const char* format, va_list param);
 
 static void ccn_publish_host_key();
 static void ccn_publish_client_mountpoint();
+struct ccn_charbuf * make_connect_template();
+void ccn_ssh_connect(char *remote_name_str);
+
+static enum ccn_upcall_res
+newServerHandler(struct ccn_closure *selfp,
+        enum ccn_upcall_kind kind,
+        struct ccn_upcall_info *info);
+static struct ccn_closure
+newServerAction =
+{
+    .p = &newServerHandler
+};
 
 #if 0
 #ifdef ENABLE_CLI_PROXYCMD
@@ -99,7 +111,10 @@ int main(int argc, char ** argv) {
 
     ccn_publish_client_mountpoint();
 
-    cli_session(cli_opts.remote_name_str);
+    ccn_ssh_connect(cli_opts.remote_name_str);
+
+    // Wait for server response
+    ccn_run(cli_opts.ssh_ccn,-1);
 
 	/* not reached */
 	return -1;
@@ -203,3 +218,117 @@ static void cli_proxy_cmd(int *sock_in, int *sock_out) {
 }
 #endif // ENABLE_CLI_PROXYCMD
 #endif
+
+void
+ccn_ssh_connect(char *remote_name_str)
+{
+    int result;
+    struct ccn_charbuf *remote_name;
+/*
+    struct ccn_pkey *server_pkey;
+    void *encrypted_local_name;
+    size_t encrypted_local_name_length;
+*/
+
+    struct ccn_charbuf *connect_template;
+
+
+    remote_name = ccn_charbuf_create();
+    result = ccn_name_from_uri(remote_name,remote_name_str);
+    if( result < 0 )
+        dropbear_exit("Could not parse server uri");
+
+    ccn_name_append_str(remote_name,"ssh/client");
+
+
+    /*
+    server_pkey = ssh_ccn_retrieve_public_key(
+            cli_opts.ssh_ccn,
+            cli_opts.remote_name_str,
+            cli_opts.ccn_cached_keystore);
+    if( server_pkey == NULL )
+        dropbear_exit("Could not get server public key");
+
+    result = ccn_pubkey_encrypt(server_pkey,
+            cli_opts.ccnxdomain,
+            strlen(cli_opts.ccnxdomain),
+            &encrypted_local_name,
+            &encrypted_local_name_length);
+
+    ccn_name_append(remote_name,encrypted_local_name);
+    */
+    ccn_name_append(remote_name,cli_opts.ccnxdomain,strlen(cli_opts.ccnxdomain));
+
+    connect_template = make_connect_template();
+
+    result = ccn_express_interest(cli_opts.ssh_ccn,
+            remote_name,
+            &newServerAction,
+            connect_template);
+    if( result < 0 )
+        dropbear_exit("Failed to express interest to server");
+}
+
+/*
+ * newServerHandler
+ *
+ * Expecting a string containing the URI for the client
+ */
+static enum ccn_upcall_res
+newServerHandler(struct ccn_closure *selfp,
+        enum ccn_upcall_kind kind,
+        struct ccn_upcall_info *info)
+{
+    int result;
+
+    const unsigned char *ccnb = NULL;
+    size_t ccnb_size;
+
+    void *data = NULL;
+    size_t data_size = 0;
+
+    switch (kind) {
+        case CCN_UPCALL_CONTENT:
+            break;
+        default:
+            return CCN_UPCALL_RESULT_ERR;
+    }
+
+    ccnb = info->content_ccnb;
+    ccnb_size = info->pco->offset[CCN_PCO_E];
+
+    result = ccn_content_get_value(ccnb, ccnb_size, info->pco, (const unsigned char **)&data, &data_size);
+    if( result < 0 )
+        dropbear_exit("Could not parse reply message");
+
+    if( strncmp((char *)data,"ccnx://",7) != 0 ) {
+        cli_opts.remote_name_str = (char *)data;
+        ses.remote_name = ccn_charbuf_create();
+        result = ccn_name_from_uri(ses.remote_name,ses.remote_name_str);
+        if( result < 0 )
+            dropbear_exit("Did not find expected uri in server response");
+
+        // Start a new session
+        cli_session(cli_opts.remote_name_str);
+
+        return CCN_UPCALL_RESULT_OK;
+    } else {
+        return CCN_UPCALL_RESULT_ERR;
+    }
+}
+
+struct ccn_charbuf *
+make_connect_template()
+{
+    struct ccn_charbuf *templ = ccn_charbuf_create();
+    ccn_charbuf_append_tt(templ, CCN_DTAG_Interest, CCN_DTAG); /* <Interest> */
+    ccn_charbuf_append_tt(templ, CCN_DTAG_Name, CCN_DTAG); /* <Name> */
+    ccn_charbuf_append_closer(templ); /* </Name> */
+
+    ccn_charbuf_append_tt(templ, CCN_DTAG_ChildSelector, CCN_DTAG);
+    ccnb_append_number(templ,1);
+    ccn_charbuf_append_closer(templ);
+
+    ccn_charbuf_append_closer(templ); /* </Interest> */
+    return templ;
+}
