@@ -78,7 +78,8 @@ static const struct ChanType *svr_chantypes[] = {
 void svr_session(int sock, int childpipe) {
 	char *host, *port;
 #endif
-void svr_session(int conn_idx) {
+void svr_session(unsigned char *local_name, unsigned char *remote_name)
+{
     dropbear_log(LOG_WARNING,"Enter svr_session");
     int result;
 #if 0
@@ -118,16 +119,24 @@ void svr_session(int conn_idx) {
 	get_socket_address(ses.sock_in, NULL, NULL, 
 			&svr_ses.remotehost, NULL, 1);
 #endif
-    ses.ssh_ccn = svr_opts.ssh_ccn;
-    ses.ccn_cached_keystore = svr_opts.ccn_cached_keystore;
-    ses.remote_name_str = svr_opts.clients[conn_idx];
-    ses.remote_name = ccn_charbuf_create();
-    if( ses.remote_name == NULL )
-        dropbear_exit("Failed to allocate server mountpoint charbuf");
+    ses.ssh_ccn = ccn_create();
+    if( ses.ssh_ccn == NULL || ccn_connect(ses.ssh_ccn,NULL) == -1 )
+        dropbear_exit("Failed to connect to ccnd");
 
+    ses.ccn_cached_keystore = svr_opts.ccn_cached_keystore;
+    ses.local_name_str = local_name;
+    ses.remote_name_str = remote_name;
+
+    ses.remote_name = ccn_charbuf_create();
     result = ccn_name_from_uri(ses.remote_name,ses.remote_name_str);
     if( result < 0 )
         dropbear_exit("Can't resolve client domain");
+    ses.local_name = ccn_charbuf_create();
+    result = ccn_name_from_uri(ses.local_name,ses.local_name_str);
+    if( result < 0 )
+        dropbear_exit("Can't resolve local domain");
+
+    dropbear_log(LOG_WARNING,"svr_session: %s <-> %s", ses.local_name_str, ses.remote_name_str);
 
 	/* set up messages etc */
 	ses.remoteclosed = svr_remoteclosed;
@@ -145,14 +154,17 @@ void svr_session(int conn_idx) {
 	session_identification();
 
 	/* start off with key exchange */
-	send_msg_kexinit();
+	//send_msg_kexinit();
 
 	/* Run the main for loop. NULL is for the dispatcher - only the client
 	 * code makes use of it */
 #if 0
 	session_loop(NULL);
 #endif
+
+    dropbear_log(LOG_WARNING,"loop?");
     ccn_run(ses.ssh_ccn,-1);
+    dropbear_log(LOG_WARNING,"deloop?");
 
 	/* Not reached */
 }

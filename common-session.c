@@ -69,7 +69,7 @@ void common_session_init(int sock_in, int sock_out) {
 void common_session_init() {
 
     dropbear_log(LOG_WARNING,"Enter common_session_init");
-	TRACE(("enter session_init"))
+	TRACE(("enter session_init"));
 
 #if 0
 	ses.sock_in = sock_in;
@@ -318,6 +318,13 @@ void session_identification() {
     // Send out a new interest for session_id
     // sessionIdHandler takes care of comparison
     int result;
+    dropbear_log(LOG_WARNING,"session_ident: register localIdentAction to");
+    print_ccnb_charbuf(ses.local_name);
+
+    result = ccn_set_interest_filter(ses.ssh_ccn,ses.local_name,&remoteIdentAction);
+
+    dropbear_log(LOG_WARNING,"session_ident: expressing interest to");
+    print_ccnb_charbuf(ses.remote_name);
 
     struct ccn_charbuf *templ = ccn_make_generic_template();
     result = ccn_express_interest(ses.ssh_ccn,ses.remote_name,
@@ -497,10 +504,17 @@ remoteIdentHandler(struct ccn_closure *selfp,
         enum ccn_upcall_kind kind,
         struct ccn_upcall_info *info)
 {
+    dropbear_log(LOG_WARNING,"enter remoteIdentHandler");
+    dropbear_log(LOG_WARNING,"Got interest matching %d components, kind = %d\n", info->matched_comps, kind);
 
     switch (kind) {
         case CCN_UPCALL_INTEREST:
             return send_ident(info);
+        case CCN_UPCALL_INTEREST_TIMED_OUT:
+            return CCN_UPCALL_RESULT_REEXPRESS;
+        case CCN_UPCALL_CONTENT_UNVERIFIED:
+            // TODO: fix verification
+            return verify_ident(info);
         case CCN_UPCALL_CONTENT:
             return verify_ident(info);
         default:
@@ -512,15 +526,38 @@ remoteIdentHandler(struct ccn_closure *selfp,
 enum ccn_upcall_res
 send_ident(struct ccn_upcall_info *info)
 {
+    dropbear_log(LOG_WARNING,"enter send_ident");
     int result;
+
+    struct ccn_charbuf *reply_name;
 
     struct ccn_charbuf *reply = NULL;
     size_t reply_length = 0;
 
-    result = ccn_wrap_content(info->interest_ccnb,
-            reply,reply_length,LOCAL_IDENT "\r\n");
-    if( ccn_put(info->h,reply->buf,reply->length) < 0 )
-        dropbear_exit("Failed to reply with ident");
+    reply_name = ccn_charbuf_create();
+    ccn_name_init(reply_name);
+    ccn_name_append_components(reply_name,
+            info->interest_ccnb,
+            info->interest_comps->buf[0],
+            info->interest_comps->buf[4]);
+
+    unsigned char *ident = LOCAL_IDENT "\r\n";
+
+    result = ccn_wrap_content(ses.ccn_cached_keystore,
+            reply_name,
+            ident, strlen(ident),
+            &reply);
+
+    dropbear_log(LOG_WARNING,"send_ident: %s (%d)",ident,strlen(ident));
+    dropbear_log(LOG_WARNING,"send_ident: reply to");
+    print_ccnb_charbuf(reply_name);
+
+    dropbear_log(LOG_WARNING,"reply length: %d",reply->length);
+
+    result = ccn_put(info->h,reply->buf,reply->length);
+    if( result < 0 ) {
+        dropbear_exit("Failed to reply with ident: %d",result);
+    }
 
     return CCN_UPCALL_RESULT_INTEREST_CONSUMED;
 }
@@ -528,6 +565,7 @@ send_ident(struct ccn_upcall_info *info)
 enum ccn_upcall_res
 verify_ident(struct ccn_upcall_info *info)
 {
+    dropbear_log(LOG_WARNING,"enter verify_ident");
     int result;
 
     unsigned char ident_reply = NULL;

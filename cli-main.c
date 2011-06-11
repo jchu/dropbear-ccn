@@ -132,13 +132,13 @@ static void cli_dropbear_exit(int exitcode, const char* format, va_list param) {
 				format);
 	} else {
 		snprintf(fmtbuf, sizeof(fmtbuf), 
+				"Connection to %s@%s exited: %s", 
+				cli_opts.username, cli_opts.remote_name_str, format);
 #if 0
 				"Connection to %s@%s:%s exited: %s", 
 				cli_opts.username, cli_opts.remotehost, 
 				cli_opts.remoteport, format);
 #endif
-				"Connection to %s@%s exited: %s", 
-				cli_opts.username, cli_opts.remote_name_str, format);
 	}
 
 	/* Do the cleanup first, since then the terminal will be reset */
@@ -336,7 +336,7 @@ newServerHandler(struct ccn_closure *selfp,
         dropbear_log(LOG_WARNING,"Connected to server at");
         print_ccnb_charbuf(ses.remote_name);
         
-        cli_session(cli_opts.remote_name_str);
+        cli_session(cli_opts.ccnxdomain,cli_opts.remote_name_str);
 
         return CCN_UPCALL_RESULT_OK;
     } else {

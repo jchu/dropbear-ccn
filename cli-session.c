@@ -87,7 +87,7 @@ static const struct ChanType *cli_chantypes[] = {
 #if 0
 void cli_session(int sock_in, int sock_out) {
 #endif
-void cli_session(char * remote_name_str) {
+void cli_session(unsigned char *local_name, unsigned char *remote_name) {
 
 	seedrandom();
 
@@ -101,7 +101,7 @@ void cli_session(char * remote_name_str) {
 	chaninitialise(cli_chantypes);
 
 	/* Set up cli_ses vars */
-	cli_session_init(remote_name_str);
+	cli_session_init(local_name,remote_name);
 
 	/* Ready to go */
 	sessinitdone = 1;
@@ -109,7 +109,7 @@ void cli_session(char * remote_name_str) {
 	/* Exchange identification */
 	session_identification();
 
-	send_msg_kexinit();
+	//send_msg_kexinit();
 
 #if 0
 	session_loop(cli_sessionloop);
@@ -120,7 +120,7 @@ void cli_session(char * remote_name_str) {
 
 }
 
-static void cli_session_init(char *remote_name_str) {
+static void cli_session_init(unsigned char *local_name, unsigned char *remote_name) {
     int result;
 
 	cli_ses.state = STATE_NOTHING;
@@ -156,14 +156,24 @@ static void cli_session_init(char *remote_name_str) {
 
     ses.ssh_ccn = cli_opts.ssh_ccn;
     ses.ccn_cached_keystore = cli_opts.ccn_cached_keystore;
-    ses.remote_name_str = remote_name_str;
+
+    ses.local_name_str = local_name;
+    ses.remote_name_str = remote_name;
+
     ses.remote_name = ccn_charbuf_create();
     if( ses.remote_name == NULL)
         dropbear_exit("Failed to allocate server mountpoint charbuf");
+    ses.local_name = ccn_charbuf_create();
+    if( ses.local_name == NULL)
+        dropbear_exit("Failed to allocate local mountpoint charbuf");
 
     result = ccn_name_from_uri(ses.remote_name,ses.remote_name_str);
     if( result < 0 )
         dropbear_exit("Can't resolve server uri");
+    result = ccn_name_from_uri(ses.local_name,ses.local_name_str);
+    if( result < 0 )
+        dropbear_exit("Can't resolve local uri");
+    dropbear_log(LOG_WARNING,"cli_session: %s <-> %s", ses.local_name_str, ses.remote_name_str);
 }
 
 #if 0
@@ -306,6 +316,7 @@ void cli_session_cleanup() {
 
 static void cli_finished() {
 
+    dropbear_log(LOG_WARNING,"enter cli_finished");
 	cli_session_cleanup();
 	common_session_cleanup();
 #if 0

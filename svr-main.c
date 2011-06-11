@@ -41,8 +41,10 @@ static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
 static void sigintterm_handler(int fish);
+#if 0
 #ifdef INETD_MODE
 static void main_inetd();
+#endif
 #endif
 #ifdef NON_INETD_MODE
 static void main_noinetd();
@@ -78,12 +80,14 @@ int main(int argc, char ** argv)
 	/* get commandline options */
 	svr_getopts(argc, argv);
 
+#if 0
 #ifdef INETD_MODE
 	/* service program mode */
 	if (svr_opts.inetdmode) {
 		main_inetd();
 		/* notreached */
 	}
+#endif
 #endif
 
 #ifdef NON_INETD_MODE
@@ -96,6 +100,7 @@ int main(int argc, char ** argv)
 }
 #endif
 
+#if 0
 #ifdef INETD_MODE
 static void main_inetd() {
 #if 0
@@ -121,11 +126,12 @@ static void main_inetd() {
 	/* Start service program 
 	 * -1 is a dummy childpipe, just something we can close() without 
 	 * mattering. */
-	svr_session(0);
+	svr_session(
 
 	/* notreached */
 }
 #endif /* INETD_MODE */
+#endif
 
 #ifdef NON_INETD_MODE
 void main_noinetd() {
@@ -507,34 +513,22 @@ newClientHandler(struct ccn_closure *selfp,
     int result;
 	pid_t fork_ret = 0;
     int child_stat_loc;
-	size_t conn_idx = DROPBEAR_MAX_CLIENTS;
 
     const unsigned char *client_domain = NULL;
     size_t client_domain_length = 0;
-    char *client_name_str = NULL;
+    unsigned char *client_name_str = NULL;
+    size_t client_name_str_length = 0;
     char clientid_str[6];
     unsigned char *client_mountid_str = NULL;
 
     struct ccn_charbuf *reply = NULL;
     size_t reply_length = 0;
-
     struct ccn_charbuf *reply_name = NULL;
 
 
     if (exitflag) {
         unlink(svr_opts.pidfile);
         dropbear_exit("Terminated by signal");
-    }
-
-    int i;
-    for( i = 0 ; i < DROPBEAR_MAX_CLIENTS ; i++ ) {
-        if( svr_opts.clients[i] == NULL )
-            conn_idx = i;
-    }
-
-    if( conn_idx == DROPBEAR_MAX_CLIENTS ) {
-        dropbear_log(LOG_WARNING,"Reached max clients");
-        return CCN_UPCALL_RESULT_ERR;
     }
 
     switch (kind) {
@@ -579,12 +573,19 @@ newClientHandler(struct ccn_closure *selfp,
                 &client_domain, &client_domain_length) < 0 )
             dropbear_exit("Error parsing client ccn domain");
 
-        client_name_str = strdup((const char *)svr_opts.ccnxdomain);
+        client_mountid_str = strdup((const char *)svr_opts.ccnxdomain);
 
         sprintf(clientid_str,"%6d",rand());
-        strcat(client_name_str,"/");
-        strcat(client_name_str,clientid_str);
-        svr_opts.clients[conn_idx] = client_name_str;
+        strcat(client_mountid_str,"/ssh/");
+        strcat(client_mountid_str,clientid_str);
+
+        result = ccn_name_comp_get(info->interest_ccnb,
+                info->interest_comps,
+                info->matched_comps,
+                &client_name_str,
+                &client_name_str_length );
+        if( result < 0 )
+            dropbear_exit("Error retrieve client mountpoint");
 
         reply_name = ccn_charbuf_create();
         ccn_name_init(reply_name);
@@ -596,7 +597,7 @@ newClientHandler(struct ccn_closure *selfp,
         dropbear_log(LOG_WARNING,"newClientHandler: replying with new client mountpoint");
         result = ccn_wrap_content(svr_opts.ccn_cached_keystore,
                 reply_name,
-                client_name_str, strlen(client_name_str),
+                client_mountid_str, strlen(client_mountid_str),
                 &reply);
         dropbear_log(LOG_WARNING,"Reply to client");
         print_ccnb_charbuf(reply_name);
@@ -624,7 +625,7 @@ newClientHandler(struct ccn_closure *selfp,
 #endif /* DEBUG_FORKGPROF */
             /* Start session and never return */
             dropbear_log(LOG_WARNING,"Start new session for client");
-            svr_session(conn_idx);
+            svr_session(client_mountid_str,client_name_str);
             dropbear_assert(0);
         }
         /* Should not get here */

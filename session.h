@@ -57,7 +57,7 @@ void fill_passwd(const char* username);
 #if 0
 void svr_session(int sock, int childpipe);
 #endif
-void svr_session(int conn_idx);
+void svr_session(unsigned char *local_name, unsigned char *remote_name);
 void svr_dropbear_exit(int exitcode, const char* format, va_list param);
 void svr_dropbear_log(int priority, const char* format, va_list param);
 
@@ -65,7 +65,7 @@ void svr_dropbear_log(int priority, const char* format, va_list param);
 #if 0
 void cli_session(int sock_in, int sock_out);
 #endif
-void cli_session(char *remote_name_str);
+void cli_session(unsigned char *local_name, unsigned char *remote_name);
 void cli_session_cleanup();
 void cleantext(unsigned char* dirtytext);
 
@@ -126,6 +126,7 @@ struct sshsession {
 
     struct ccn *ssh_ccn;
     struct ccn_keystore *ccn_cached_keystore;
+    struct ccn_charbuf *local_name;
     char *local_name_str;
     struct ccn_charbuf *remote_name;
     char *remote_name_str;
